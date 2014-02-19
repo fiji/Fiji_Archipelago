@@ -28,7 +28,6 @@ import edu.utexas.clm.archipelago.compute.ProcessManager;
 import edu.utexas.clm.archipelago.data.ClusterMessage;
 import edu.utexas.clm.archipelago.network.MessageXC;
 import edu.utexas.clm.archipelago.network.translation.Bottler;
-import edu.utexas.clm.archipelago.network.translation.PMAcknowledgingSender;
 import edu.utexas.clm.archipelago.network.translation.PathSubstitutingFileTranslator;
 import edu.utexas.clm.archipelago.util.XCErrorAdapter;
 
@@ -36,10 +35,6 @@ import java.io.*;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Hashtable;
-import java.util.Set;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicBoolean;
 /**
@@ -131,10 +126,7 @@ public class ArchipelagoClient implements TransceiverListener
             runningThreads.remove(this);
             if (running.get() && active.get())
             {
-                PMAcknowledgingSender ack = new PMAcknowledgingSender(xc, process);
-                processAcks.put(process.getID(), ack);
-                ack.go();
-                //xc.queueMessage(MessageType.PROCESS, process);
+                xc.queueMessage(MessageType.PROCESS, process);
             }
         }
     }
@@ -146,8 +138,6 @@ public class ArchipelagoClient implements TransceiverListener
     private final Vector<ProcessThread> runningThreads;
     private final HeartBeatThread beatThread;
     private final TransceiverExceptionListener xcEListener;
-    private final Hashtable<Long, PMAcknowledgingSender> processAcks;
-    private final Set<Long> processIdMemory;
 
     public ArchipelagoClient(final long id, final InputStream inStream,
                              final OutputStream outStream) throws IOException
@@ -204,10 +194,6 @@ public class ArchipelagoClient implements TransceiverListener
                              TransceiverExceptionListener tel) throws IOException
     {
         FijiArchipelago.log("Starting Archipelago Client...");
-
-        processAcks = new Hashtable<Long, PMAcknowledgingSender>();
-        processIdMemory = Collections.synchronizedSet(new HashSet<Long>());
-
         try
         {
             xcEListener = tel;
@@ -258,34 +244,9 @@ public class ArchipelagoClient implements TransceiverListener
             {
                 case PROCESS:
                     final ProcessManager<?> pm = (ProcessManager<?>)object;
-                    boolean seen = processIdMemory.contains(pm.getID());
-                    processIdMemory.add(pm.getID());
-
-                    xc.queueMessage(MessageType.ACK, pm.getID());
-
-                    if (!seen)
-                    {
-                        final ProcessThread pt = new ProcessThread(pm);
-                        runningThreads.add(pt);
-                        pt.start();
-                    }
-
-                    break;
-
-                case ACK:
-                    long pmid = (Long)object;
-                    PMAcknowledgingSender ack = processAcks.remove(pmid);
-
-                    // ack can be null in the situation in which a previous ACK message was sent by the remote just
-                    // as we were re-sending a process message.
-
-                    if (ack != null)
-                    {
-                        ack.acknowledge();
-                    }
-
-                    FijiArchipelago.debug("Processed ack for " + pmid);
-
+                    final ProcessThread pt = new ProcessThread(pm);
+                    runningThreads.add(pt);
+                    pt.start();
                     break;
 
                 case HALT:
