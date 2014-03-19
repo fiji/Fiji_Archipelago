@@ -4,7 +4,7 @@ import com.jcraft.jsch.*;
 import edu.utexas.clm.archipelago.FijiArchipelago;
 import edu.utexas.clm.archipelago.exception.ShellExecutionException;
 import edu.utexas.clm.archipelago.listen.NodeShellListener;
-import edu.utexas.clm.archipelago.network.node.NodeManager;
+import edu.utexas.clm.archipelago.network.node.NodeParameters;
 
 import java.io.File;
 import java.io.InputStream;
@@ -20,7 +20,7 @@ public class JSchUtility extends Thread
     private final Channel channel;
     private final long node;
     
-    public JSchUtility(final NodeManager.NodeParameters param,
+    public JSchUtility(final NodeParameters param,
                        final NodeShellListener listener,
                        final String command)
             throws ShellExecutionException
@@ -96,7 +96,7 @@ public class JSchUtility extends Thread
         session.disconnect();
     }
     
-    public static boolean fileExists(final NodeManager.NodeParameters param,
+    public static boolean fileExists(final NodeParameters param,
                                      final String file)
             throws ShellExecutionException
     {

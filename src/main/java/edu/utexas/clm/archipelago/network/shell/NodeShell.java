@@ -19,8 +19,8 @@
 package edu.utexas.clm.archipelago.network.shell;
 
 import edu.utexas.clm.archipelago.exception.ShellExecutionException;
-import edu.utexas.clm.archipelago.network.node.NodeManager;
 import edu.utexas.clm.archipelago.listen.NodeShellListener;
+import edu.utexas.clm.archipelago.network.node.NodeParameters;
 
 /**
  * Interface used to start remote nodes and potentially execute shell commands.
@@ -48,7 +48,7 @@ public interface NodeShell
      * @return true if started successfully.
      * @throws ShellExecutionException if an error occurs while attempting to
      */
-    public boolean startShell(final NodeManager.NodeParameters param, final NodeShellListener listener)
+    public boolean startShell(final NodeParameters param, final NodeShellListener listener)
             throws ShellExecutionException;
     
     public NodeShellParameters defaultParameters();

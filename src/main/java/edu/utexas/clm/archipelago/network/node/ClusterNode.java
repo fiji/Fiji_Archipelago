@@ -21,6 +21,7 @@ package edu.utexas.clm.archipelago.network.node;
 import edu.utexas.clm.archipelago.*;
 import edu.utexas.clm.archipelago.data.Duplex;
 import edu.utexas.clm.archipelago.data.HeartBeat;
+import edu.utexas.clm.archipelago.exception.ShellExecutionException;
 import edu.utexas.clm.archipelago.listen.*;
 import edu.utexas.clm.archipelago.compute.ProcessManager;
 import edu.utexas.clm.archipelago.data.ClusterMessage;
@@ -52,21 +53,20 @@ public class ClusterNode implements TransceiverListener
     private final AtomicInteger ramMBAvail, ramMBTot, ramMBMax, runningCores;
     private long nodeID;
     private long lastBeatTime;
-    private NodeManager.NodeParameters nodeParam;
+    private NodeParameters nodeParam;
     private final AtomicBoolean idSet, cpuSet;
     private ClusterNodeState state;
     private final Vector<NodeStateListener> stateListeners;
     private final TransceiverExceptionListener xcEListener;
-    private final NodeManager manager;
+
 
    
-    public ClusterNode(final TransceiverExceptionListener tel, final NodeManager nodeManager)
+    public ClusterNode(final NodeParameters params, final TransceiverExceptionListener tel)
     {
         xc = null;
         lastBeatTime = 0;
         state = ClusterNodeState.INACTIVE;
 
-//        ready = new AtomicBoolean(false);
         idSet = new AtomicBoolean(false);
         cpuSet = new AtomicBoolean(false);
 
@@ -76,11 +76,10 @@ public class ClusterNode implements TransceiverListener
         runningCores = new AtomicInteger(0);
         processHandlers = new Hashtable<Long, ProcessListener>();
         runningProcesses = new Hashtable<Long, ProcessManager>();
-        nodeID = -1;
-        nodeParam = null;
+        nodeID = params.getID();
+        nodeParam = params;
         stateListeners = new Vector<NodeStateListener>();
         xcEListener = tel;
-        manager = nodeManager;
     }
     
     private void doSyncEnvironment()
@@ -110,36 +109,16 @@ public class ClusterNode implements TransceiverListener
         xc.queueMessage(MessageType.BEAT);
     }
     
-    public boolean setExecPath(String path)
+    public void setExecPath(String path)
     {
-        if (nodeParam == null)
-        {
-            return false;
-        }
-        else
-        {
             nodeParam.setExecRoot(path);
-            return true;
-        }
     }
     
-    public boolean setFilePath(String path)
+    public void setFilePath(String path)
     {
-
-        if (nodeParam == null)
-        {
-            return false;
-        }
-        else
-        {
-            nodeParam.setFileRoot(path);
-            xc.setFileSystemTranslator(
-                    new PathSubstitutingFileTranslator(FijiArchipelago.getFileRoot(), path));
-//            return xc.queueMessage(MessageType.SETFILEROOT, path);
-//            return xc.queueMessage(MessageType.SETFSTRANSLATION,
-//                    new Duplex<String, String>(path, FijiArchipelago.getFileRoot()));
-            return true;
-        }
+        nodeParam.setFileRoot(path);
+        xc.setFileSystemTranslator(
+                new PathSubstitutingFileTranslator(FijiArchipelago.getFileRoot(), path));
     }
 
     public void streamClosed()
@@ -153,10 +132,7 @@ public class ClusterNode implements TransceiverListener
 
     /**
      * Sets the InputStream and OutputStream used to communicate with the remote compute node.
-     * is and os are used to create a MessageXC. The remote node is then queried for its unique id
-     * as well as the number of available threads if that was not set explicitly. Once we've
-     * received that information, messages are passed to synchronize nonessential parameters and
-     * start BEAT messages, then the Cluster's state is set to ready.
+     * is and os are used to create a MessageXC.
      * @param is InputStream to receive data from the remote machine
      * @param os OutputStream to send data to the remote machine
      * @throws IOException if a problem arises opening one of the streams
@@ -166,40 +142,10 @@ public class ClusterNode implements TransceiverListener
     public synchronized void setIOStreams(final InputStream is, final OutputStream os)
             throws IOException, TimeoutException, InterruptedException
     {
-        int waitCnt = 0;
-
         FijiArchipelago.debug("Setting IO Streams for a new Cluster Node");
         
         xc = new MessageXC(is, os, this, xcEListener);
         xc.queueMessage(MessageType.GETID);
-        
-        idSet.set(false);
-        cpuSet.set(false);
-
-        FijiArchipelago.debug("Waiting for id...");
-        while (!idSet.get() && !cpuSet.get())
-        {
-            String message = "Waiting for ";
-            if (!idSet.get())
-            {
-                message += "id ";
-            }
-            if (!cpuSet.get())
-            {
-                message += "ncpu";
-            }
-            
-            FijiArchipelago.debug(message);
-            
-            Thread.sleep(1000);
-            if (waitCnt++ > 15)
-            {
-                FijiArchipelago.debug("Waited too long, giving up.");
-                throw new TimeoutException("Timed out waiting for remote node");
-            }
-        }
-
-        FijiArchipelago.debug("Cluster Node " + getHost() + " ready to go");
 
         doSyncEnvironment();
         setState(ClusterNodeState.ACTIVE);
@@ -207,7 +153,7 @@ public class ClusterNode implements TransceiverListener
 
     public String getHost()
     {
-        return nodeParam == null ? null : nodeParam.getHost();
+        return nodeParam.getHost();
     }
     
     public String getUser()
@@ -234,15 +180,8 @@ public class ClusterNode implements TransceiverListener
     {
         return nodeID;
     }
-    
-/*
-    public NodeShell getShell()
-    {
-        return nodeParam.getShell();
-    }
-*/
 
-    public NodeManager.NodeParameters getParam()
+    public NodeParameters getParam()
     {
         return nodeParam;
     }
@@ -319,41 +258,41 @@ public class ClusterNode implements TransceiverListener
         {
             switch (type)
             {
-                case GETID:
-                    Long id = (Long)object;
-                    
-                    FijiArchipelago.debug("Got id message. Setting ID to " + id + ". Param: " + nodeParam);
-                    if (id >=0)
-                    {
-                        nodeParam = manager.getParam(id);
-                        nodeID = id;
-                        xc.queueMessage(MessageType.SETFSTRANSLATION,
-                                new Duplex<String, String>(nodeParam.getFileRoot(),
-                                        FijiArchipelago.getFileRoot()));
-                    }
-                    else
-                    {
-                        nodeParam = manager.newParam();                        
-                        nodeID = nodeParam.getID();                        
-                        xc.queueMessage(MessageType.SETID, nodeID);
-                        xc.queueMessage(MessageType.HOSTNAME);
-                    }
-                    idSet.set(true);
-                    xc.setId(nodeID);
-                    nodeParam.setNode(this);
-
-                    if (nodeParam.getThreadLimit() <= 0)
-                    {
-                        FijiArchipelago.debug("Queueing ncpu request...");
-                        xc.queueMessage(MessageType.NUMTHREADS);
-                        FijiArchipelago.debug("Done.");
-                    }
-                    else
-                    {
-                        cpuSet.set(true);
-                    }
-
-                    break;
+//                case GETID:
+//                    Long id = (Long)object;
+//
+//                    FijiArchipelago.debug("Got id message. Setting ID to " + id + ". Param: " + nodeParam);
+//                    if (id >=0)
+//                    {
+//                        nodeParam = manager.getParam(id);
+//                        nodeID = id;
+//                        xc.queueMessage(MessageType.SETFSTRANSLATION,
+//                                new Duplex<String, String>(nodeParam.getFileRoot(),
+//                                        FijiArchipelago.getFileRoot()));
+//                    }
+//                    else
+//                    {
+//                        nodeParam = manager.newParam();
+//                        nodeID = nodeParam.getID();
+//                        xc.queueMessage(MessageType.SETID, nodeID);
+//                        xc.queueMessage(MessageType.HOSTNAME);
+//                    }
+//                    idSet.set(true);
+//                    xc.setId(nodeID);
+//                    nodeParam.setNode(this);
+//
+//                    if (nodeParam.getThreadLimit() <= 0)
+//                    {
+//                        FijiArchipelago.debug("Queueing ncpu request...");
+//                        xc.queueMessage(MessageType.NUMTHREADS);
+//                        FijiArchipelago.debug("Done.");
+//                    }
+//                    else
+//                    {
+//                        cpuSet.set(true);
+//                    }
+//
+//                    break;
 
                 case BEAT:
                     HeartBeat beat = (HeartBeat)object;
@@ -379,34 +318,33 @@ public class ClusterNode implements TransceiverListener
                 case NUMTHREADS:
                     int n = (Integer)object;
                     nodeParam.setThreadLimit(n);
-                    cpuSet.set(true);
                     break;
                 
-                case HOSTNAME:
-                    String name = (String)object;
-                    nodeParam.setHost(name);
+//                case HOSTNAME:
+//                    String name = (String)object;
+//                    nodeParam.setHost(name);
+//
+//                    break;
 
-                    break;
-                
                 case PING:                
                     FijiArchipelago.log("Received ping from " + getHost());
                     break;
             
-                case USER:
-                    if (nodeParam == null)
-                    {
-                        FijiArchipelago.err("Tried to set user but params are null");
-                    }
-                    if (object != null)
-                    {
-                        String username = (String)object;
-                        nodeParam.setUser(username);
-                    }
-                    else
-                    {
-                        FijiArchipelago.err("Got username message with null user");
-                    }
-                    break;
+//                case USER:
+//                    if (nodeParam == null)
+//                    {
+//                        FijiArchipelago.err("Tried to set user but params are null");
+//                    }
+//                    if (object != null)
+//                    {
+//                        String username = (String)object;
+//                        nodeParam.setUser(username);
+//                    }
+//                    else
+//                    {
+//                        FijiArchipelago.err("Got username message with null user");
+//                    }
+//                    break;
 
                 case GETFSTRANSLATION:
                     // Results of a GETFSTRANSLATION request sent to the client.
@@ -497,6 +435,8 @@ public class ClusterNode implements TransceiverListener
         {
             case ACTIVE:
                 return "active";
+            case WAITING:
+                return "waiting";
             case INACTIVE:
                 return "inactive";
             case STOPPED:
@@ -511,7 +451,6 @@ public class ClusterNode implements TransceiverListener
         if (state != nextState)
         {
             // Order is very important
-            Thread.dumpStack();
             ClusterNodeState lastState = state;
             state = nextState;
             FijiArchipelago.log("Node state changed from "
@@ -585,5 +524,15 @@ public class ClusterNode implements TransceiverListener
     public String toString()
     {
         return getHost();
+    }
+
+    public synchronized void start(NodeShellListener listener) throws ShellExecutionException
+    {
+        if (state == ClusterNodeState.INACTIVE)
+        {
+            setState(ClusterNodeState.WAITING);
+            nodeParam.getShell().startShell(nodeParam, listener);
+        }
+
     }
 }

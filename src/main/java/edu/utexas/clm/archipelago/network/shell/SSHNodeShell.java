@@ -5,7 +5,7 @@ import com.jcraft.jsch.*;
 import edu.utexas.clm.archipelago.FijiArchipelago;
 import edu.utexas.clm.archipelago.exception.ShellExecutionException;
 import edu.utexas.clm.archipelago.listen.NodeShellListener;
-import edu.utexas.clm.archipelago.network.node.NodeManager;
+import edu.utexas.clm.archipelago.network.node.NodeParameters;
 import edu.utexas.clm.archipelago.network.shell.ssh.JSchUtility;
 
 import java.io.File;
@@ -19,7 +19,7 @@ public class SSHNodeShell implements NodeShell
 
     private static final SSHNodeShell shell = new SSHNodeShell();
     
-    protected String getArguments(final NodeManager.NodeParameters param,
+    protected String getArguments(final NodeParameters param,
                                   NodeShellListener listener)
     {
         final String eroot = param.getExecRoot();
@@ -28,7 +28,7 @@ public class SSHNodeShell implements NodeShell
                 + param.getID();
     }
     
-    protected void handleJSE(final JSchException jse, final NodeManager.NodeParameters param)
+    protected void handleJSE(final JSchException jse, final NodeParameters param)
             throws ShellExecutionException
     {
         if (jse.getMessage().equals("Auth cancel"))
@@ -44,7 +44,7 @@ public class SSHNodeShell implements NodeShell
         throw new ShellExecutionException(jse);
     }
     
-    public boolean startShell(final NodeManager.NodeParameters param, final NodeShellListener listener)
+    public boolean startShell(final NodeParameters param, final NodeShellListener listener)
             throws ShellExecutionException
     {
         FijiArchipelago.debug("Starting SSH shell on " + param.getHost());
