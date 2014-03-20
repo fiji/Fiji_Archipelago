@@ -297,6 +297,9 @@ public class MessageXC
         return lastSentID.get();
     }
 
+    /**
+     * Shutdown this MessageXC, closing the I/O streams as well.
+     */
     public void close()
     {
         if (active.get())
@@ -316,6 +319,20 @@ public class MessageXC
                 outStream.close();
             }
             catch (IOException ioe) {/**/}
+        }
+    }
+
+    /**
+     * Soft shutdown, in other words, stop listening to the IO streams, but leave them open.
+     */
+    public void softClose()
+    {
+        if (active.get())
+        {
+            FijiArchipelago.debug("XC: Soft close.");
+            active.set(false);
+            txThread.interrupt();
+            rxThread.interrupt();
         }
     }
 

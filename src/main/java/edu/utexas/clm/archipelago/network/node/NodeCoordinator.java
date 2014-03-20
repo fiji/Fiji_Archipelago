@@ -26,9 +26,9 @@ public class NodeCoordinator implements NodeStateListener, NodeShellListener
 {
     private class NodeInitializer implements TransceiverListener
     {
-        final MessageXC xc;
-        final InputStream is;
-        final OutputStream os;
+        MessageXC xc;
+        InputStream is;
+        OutputStream os;
 
         public NodeInitializer(final InputStream is, final OutputStream os) throws IOException
         {
@@ -47,6 +47,24 @@ public class NodeCoordinator implements NodeStateListener, NodeShellListener
 
             xc = new MessageXC(is, os, this, tel);
             xc.queueMessage(MessageType.GETID);
+        }
+
+        private void cleanup()
+        {
+            xc = null;
+            is = null;
+            os = null;
+        }
+
+        private void setupVolunteer()
+        {
+            long id = FijiArchipelago.getUniqueID();
+
+            xc.queueMessage(MessageType.SETID, id);
+            xc.queueMessage(MessageType.HOSTNAME);
+            xc.queueMessage(MessageType.USER);
+            xc.queueMessage(MessageType.GETEXECROOT);
+
         }
 
         public void streamClosed()
@@ -71,6 +89,8 @@ public class NodeCoordinator implements NodeStateListener, NodeShellListener
                         if (node != null)
                         {
                             node.setIOStreams(is, os);
+                            xc.softClose();
+                            cleanup();
                         }
                         else
                         {
@@ -79,7 +99,7 @@ public class NodeCoordinator implements NodeStateListener, NodeShellListener
                     }
                     else
                     {
-                        //TODO: Handle "volunteer" node
+                        setupVolunteer();
                     }
             }
             }
