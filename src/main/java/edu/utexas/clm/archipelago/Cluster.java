@@ -21,18 +21,15 @@ package edu.utexas.clm.archipelago;
 
 import edu.utexas.clm.archipelago.compute.*;
 import edu.utexas.clm.archipelago.data.ClusterMessage;
-import edu.utexas.clm.archipelago.exception.ShellExecutionException;
 import edu.utexas.clm.archipelago.listen.ClusterStateListener;
 import edu.utexas.clm.archipelago.listen.MessageType;
-import edu.utexas.clm.archipelago.listen.NodeStateListener;
 import edu.utexas.clm.archipelago.listen.ProcessListener;
-import edu.utexas.clm.archipelago.listen.NodeShellListener;
 import edu.utexas.clm.archipelago.network.MessageXC;
 import edu.utexas.clm.archipelago.network.node.ClusterNode;
 import edu.utexas.clm.archipelago.network.node.ClusterNodeState;
 import edu.utexas.clm.archipelago.network.node.NodeCoordinator;
-import edu.utexas.clm.archipelago.network.node.NodeManager;
 import edu.utexas.clm.archipelago.network.node.NodeParameters;
+import edu.utexas.clm.archipelago.network.node.NodeParametersFactory;
 import edu.utexas.clm.archipelago.network.shell.NodeShell;
 import edu.utexas.clm.archipelago.network.shell.SSHNodeShell;
 import edu.utexas.clm.archipelago.network.shell.SocketNodeShell;
@@ -45,10 +42,8 @@ import ij.Prefs;
 
 import java.io.EOFException;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InvalidClassException;
 import java.io.NotSerializableException;
-import java.io.OutputStream;
 import java.io.StreamCorruptedException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -78,7 +73,7 @@ import java.util.concurrent.locks.ReentrantLock;
  *
  * @author Larry Lindsey
  */
-public class Cluster implements NodeStateListener
+public class Cluster
 {
 
     public static enum ClusterState
@@ -219,7 +214,7 @@ public class Cluster implements NodeStateListener
         
         private synchronized ClusterNode getFreeNode()
         {
-            for (ClusterNode node : nodes)
+            for (ClusterNode node : nodeCoordinator.getRunningNodes())
             {
                 if (node.numAvailableThreads() > 0)
                 {
@@ -333,7 +328,7 @@ public class Cluster implements NodeStateListener
                 }
 
                 // Add any newly-available nodes we might have.
-                for (ClusterNode node : nodes)
+                for (ClusterNode node : nodeCoordinator.getRunningNodes())
                 {
                     if (node.numAvailableThreads() > 0 && !nodeList.contains(node))
                     {
@@ -344,10 +339,7 @@ public class Cluster implements NodeStateListener
                 comparator.setThreadCount(getMaxThreads());
                 
                 //Put priority jobs in front of the internal queue, in the correct order
-//                FijiArchipelago.debug("Scheduler: " + priorityJobQueue.size() +
-//                        " jobs in priority queue");
-//
-                priorityJobQueue.drainTo(tempQ);                
+                priorityJobQueue.drainTo(tempQ);
                 Collections.sort(tempQ, comparator);
                 for (int i = tempQ.size(); i > 0; --i)
                 {
@@ -900,7 +892,7 @@ public class Cluster implements NodeStateListener
 
     /*
    Backing the ClusterState with an atomic integer reduces the chances for a race condition
-   or some other concurrent modification nightmare. This is much prefered to the alternative
+   or some other concurrent modification nightmare. This is much preferred to the alternative
    of using a ReentrantLock
     */
 
@@ -994,9 +986,9 @@ public class Cluster implements NodeStateListener
         final String prefRoot = FijiArchipelago.PREF_ROOT;
         //boolean isConfigured = cluster.getState() != Cluster.ClusterState.INSTANTIATED;
 
-        cluster.getNodeManager().getDefaultParameters().setUser(userName);
-        cluster.getNodeManager().getDefaultParameters().setExecRoot(execRootRemote);
-        cluster.getNodeManager().getDefaultParameters().setFileRoot(fileRootRemote);
+        cluster.getParametersFactory().setDefaultUser(userName);
+        cluster.getParametersFactory().setDefaultExecRoot(execRootRemote);
+        cluster.getParametersFactory().setDefaultFileRoot(fileRootRemote);
         //cluster.getNodeManager().getDefaultParameters().setShell(SocketNodeShell.getShell());
 
         FijiArchipelago.setExecRoot(execRoot);
@@ -1034,7 +1026,6 @@ public class Cluster implements NodeStateListener
      */
     private AtomicInteger state;
     
-    //private final AtomicBoolean halted, ready, terminated, initted, started;        
     private final AtomicInteger jobCount;
 
     private final Vector<Thread> waitThreads;
@@ -1053,7 +1044,9 @@ public class Cluster implements NodeStateListener
     private final XCErrorAdapter xcEListener;
     
     private final Cluster self = this;
-    
+
+    private final NodeParametersFactory parametersFactory;
+
     private final long hash;
 
     private Cluster()
@@ -1149,15 +1142,13 @@ public class Cluster implements NodeStateListener
 
         scheduler = new ProcessScheduler(1000);
         
-        nodeManager = new NodeManager();
-
-        xcEListener.setNodeManager(nodeManager);
-
         futures = new Hashtable<Long, ArchipelagoFuture<?>>();
         
         listeners = new Vector<ClusterStateListener>();
         
         hash = new Long(System.currentTimeMillis()).hashCode();
+
+        parametersFactory = new NodeParametersFactory();
 
         try
         {
@@ -1228,6 +1219,11 @@ public class Cluster implements NodeStateListener
     {
         nodeCoordinator.startNode(node);
     }
+
+    public void startNode(final NodeParameters params)
+    {
+        nodeCoordinator.startNode(params);
+    }
     
 
     public boolean hasNode(final long id)
@@ -1253,7 +1249,7 @@ public class Cluster implements NodeStateListener
         listeners.remove(listener);
     }
     
-    protected void triggerListeners()
+    public void triggerListeners()
     {
         Vector<ClusterStateListener> listenersLocal = new Vector<ClusterStateListener>(listeners);
         for (ClusterStateListener listener : listenersLocal)
@@ -1268,64 +1264,6 @@ public class Cluster implements NodeStateListener
         return state == ClusterState.RUNNING || state == ClusterState.STARTED;
     }
     
-    public synchronized void stateChanged(ClusterNode node, ClusterNodeState stateNow,
-                             ClusterNodeState lastState)
-    {
-/*
-                FijiArchipelago.debug("Got state change to stopped for " + node.getHost());
-
-                for (ProcessManager<?> pm : node.getRunningProcesses())
-                {
-                    if (isShutdown())
-                    {
-                        FijiArchipelago.debug("Cancelling running job " + pm.getID());
-                        decrementJobCount();
-                        futures.get(pm.getID()).cancel(true);
-                    }
-                    else
-                    {
-                        FijiArchipelago.debug("Rescheduling job " + pm.getID());
-                        decrementJobCount();
-
-                        if (!scheduler.queueJob(pm, true))
-                        {
-                            FijiArchipelago.err("Could not reschedule job " + pm.getID());
-                            futures.get(pm.getID()).finish(
-                                    new Exception("Could not reschedule job"));
-                        }
-                    }
-                }
-
-                removeNode(node.getID());
-
-                if (runningNodes.decrementAndGet() <= 0)
-                {
-                    FijiArchipelago.debug("Node more running nodes");
-                    if (runningNodes.get() < 0)
-                    {
-                        FijiArchipelago.log("Number of running nodes is negative. " +
-                                "That shouldn't happen.");
-                    }
-
-//                    ready.set(false);
-
-                    if (getState() == ClusterState.STOPPING)
-                    {
-                        terminateFinished();
-                    }
-                    else
-                    {
-                        setState(ClusterState.STARTED);
-                    }
-                }
-
-                FijiArchipelago.debug("There are now " + runningNodes.get() + " running nodes");
-                break;
-*/
-
-        triggerListeners();
-    }
-
     private boolean nodesWaiting()
     {
         return nodeCoordinator.numWaitingNodes() > 0;
@@ -1404,7 +1342,7 @@ public class Cluster implements NodeStateListener
 
     public int countReadyNodes()
     {
-        return nodeCoordinator.numReadyNodes();
+        return nodeCoordinator.numRunningNodes();
     }
     
     public boolean isReady()
@@ -1491,7 +1429,12 @@ public class Cluster implements NodeStateListener
      */
     public ArrayList<NodeParameters> getNodeParameters()
     {
-        return nodeCoordinator.getNodeParameters();
+        return nodeCoordinator.getParameters();
+    }
+
+    public NodeParametersFactory getParametersFactory()
+    {
+        return parametersFactory;
     }
 
     public void addBottler(final Bottler bottler)
@@ -1514,11 +1457,6 @@ public class Cluster implements NodeStateListener
         }
     }
 
-    public NodeManager getNodeManager()
-    {
-        return nodeManager;
-    }
-    
     public int getRunningJobCount()
     {
         return jobCount.get();
@@ -1540,8 +1478,6 @@ public class Cluster implements NodeStateListener
     {
         ArrayList<Thread> waitThreadsCP = new ArrayList<Thread>(waitThreads);
         
-        nodeManager.clear();
-
         setState(ClusterState.STOPPED);
         scheduler.close();
 
@@ -1571,6 +1507,47 @@ public class Cluster implements NodeStateListener
             runnables.add(new QuickRunnable(pm.getCallable()));
         }
         return runnables;
+    }
+
+    public void nodeStopped(final ClusterNode node, final int nRunningNodes)
+    {
+        for (ProcessManager<?> pm : node.getRunningProcesses())
+        {
+            if (isShutdown())
+            {
+                FijiArchipelago.debug("Cancelling running job " + pm.getID());
+                decrementJobCount();
+                futures.get(pm.getID()).cancel(true);
+            }
+            else
+            {
+                FijiArchipelago.debug("Rescheduling job " + pm.getID());
+                decrementJobCount();
+
+                if (!scheduler.queueJob(pm, true))
+                {
+                    FijiArchipelago.err("Could not reschedule job " + pm.getID());
+                    futures.get(pm.getID()).finish(
+                            new Exception("Could not reschedule job"));
+                }
+            }
+        }
+
+        if (nRunningNodes < 1)
+        {
+            FijiArchipelago.debug("Node more running nodes");
+
+            if (getState() == ClusterState.STOPPING)
+            {
+                terminateFinished();
+            }
+            else
+            {
+                setState(ClusterState.STARTED);
+            }
+        }
+
+        FijiArchipelago.debug("There are now " + nRunningNodes + " running nodes");
     }
 
     public boolean isShutdown()

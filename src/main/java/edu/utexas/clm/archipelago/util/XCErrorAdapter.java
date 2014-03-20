@@ -22,7 +22,6 @@ import edu.utexas.clm.archipelago.FijiArchipelago;
 import edu.utexas.clm.archipelago.data.ClusterMessage;
 import edu.utexas.clm.archipelago.listen.TransceiverExceptionListener;
 import edu.utexas.clm.archipelago.network.MessageXC;
-import edu.utexas.clm.archipelago.network.node.NodeManager;
 
 import java.util.HashSet;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -35,8 +34,6 @@ public class XCErrorAdapter implements TransceiverExceptionListener
 
     private final AtomicBoolean isQuiet;
     
-    private NodeManager nodeManager = null;
-
     public XCErrorAdapter()
     {
         throwablesSeenRX = new HashSet<Class>();
@@ -44,11 +41,6 @@ public class XCErrorAdapter implements TransceiverExceptionListener
         isQuiet = new AtomicBoolean(false);
     }
     
-    public void setNodeManager(final NodeManager nm)
-    {
-        nodeManager = nm;
-    }
-
     protected boolean handleCustomRX(final Throwable t, final MessageXC mxc,
                                      final ClusterMessage message)
     {
@@ -83,20 +75,13 @@ public class XCErrorAdapter implements TransceiverExceptionListener
     
     protected void reportRX(final Throwable t, final String message, final MessageXC mxc)
     {
-        final NodeManager.NodeParameters np = nodeManager == null ? null :
-                nodeManager.getParam(mxc.getId());
-        final String hostString = np == null ? "" : np.getHost() + ": ";
-
-        report(t, "RX: " + hostString + message, throwablesSeenRX);
+        report(t, "RX: " + mxc.getHostname() + ": " + message, throwablesSeenRX);
     }
 
     protected void reportTX(final Throwable t, final String message, final MessageXC mxc)
     {
-        final String hostString = nodeManager == null ? "" :
-                nodeManager.getParam(mxc.getId()) == null ? "" :
-                        nodeManager.getParam(mxc.getId()).getHost() + ": ";
 
-        report(t, "TX: " + hostString + message, throwablesSeenTX);
+        report(t, "TX: " + mxc.getHostname() + ": "  + message, throwablesSeenTX);
     }
 
     public void handleRXThrowable(final Throwable t, final MessageXC mxc,

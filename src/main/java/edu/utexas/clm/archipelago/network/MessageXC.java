@@ -239,6 +239,7 @@ public class MessageXC
     private BottlingOutputStream objectOutputStream;
     private BottlingInputStream objectInputStream;
     private FileTranslator fileTranslator;
+    private String host;
     private final Thread txThread, rxThread;
     private final AtomicBoolean active;
     private final AtomicLong lastSentID;
@@ -282,6 +283,8 @@ public class MessageXC
         tUnit = unit;
         xcListener = listener;
         xcExceptionListener = listenerE;
+
+        host = "Unknown host";
 
         txThread = new TXThread();
         rxThread = new RXThread();
@@ -391,6 +394,16 @@ public class MessageXC
     public void setId(final long id)
     {
         this.id = id;
+    }
+
+    public void setHostname(String host)
+    {
+        this.host = host;
+    }
+
+    public String getHostname()
+    {
+        return host;
     }
 
     public String getLocalPath(final String remotePath)

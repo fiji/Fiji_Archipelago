@@ -20,5 +20,5 @@ package edu.utexas.clm.archipelago.network.node;
 
 public enum ClusterNodeState
 {
-    INACTIVE, WAITING, ACTIVE, STOPPED
+    INACTIVE, WAITING, ACTIVE, STOPPED, FAILED
 }

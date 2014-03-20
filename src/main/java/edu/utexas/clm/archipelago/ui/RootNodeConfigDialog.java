@@ -55,11 +55,11 @@ public class RootNodeConfigDialog implements ActionListener
         setEntry("execRoot", FijiArchipelago.getExecRoot(), useDefault);
         setEntry("fileRoot", FijiArchipelago.getFileRoot(), useDefault);
         setEntry("execRootRemote",
-                cluster.getNodeManager().getDefaultParameters().getExecRoot(), useDefault);
+                cluster.getParametersFactory().getDefaultExecRoot(), useDefault);
         setEntry("fileRootRemote",
-                cluster.getNodeManager().getDefaultParameters().getFileRoot(), useDefault);
+                cluster.getParametersFactory().getDefaultFileRoot(), useDefault);
         setEntry("username",
-                cluster.getNodeManager().getDefaultParameters().getUser(), useDefault);
+                cluster.getParametersFactory().getDefaultUser(), useDefault);
 
         gbc.fill = GridBagConstraints.BOTH;
         gbc.weightx = 0.0;

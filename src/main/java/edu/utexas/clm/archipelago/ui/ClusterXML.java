@@ -4,6 +4,8 @@ package edu.utexas.clm.archipelago.ui;
 import edu.utexas.clm.archipelago.Cluster;
 import edu.utexas.clm.archipelago.FijiArchipelago;
 import edu.utexas.clm.archipelago.network.node.NodeManager;
+import edu.utexas.clm.archipelago.network.node.NodeParameters;
+import edu.utexas.clm.archipelago.network.node.NodeParametersFactory;
 import edu.utexas.clm.archipelago.network.shell.NodeShellParameters;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -33,8 +35,8 @@ public class ClusterXML
             FijiArchipelago.debug("Save called");
             final DocumentBuilder docBuilder =
                     DocumentBuilderFactory.newInstance().newDocumentBuilder();
-            final NodeManager nm = cluster.getNodeManager();
-            final ArrayList<NodeManager.NodeParameters> params = cluster.getNodeParameters();
+            final NodeParametersFactory paramFactory = cluster.getParametersFactory();
+            final ArrayList<NodeParameters> params = cluster.getNodeParameters();
             final Document doc = docBuilder.newDocument();
             final Element clusterXML = doc.createElement("Cluster");
             final Element rootNode = doc.createElement("RootNode");
@@ -51,13 +53,13 @@ public class ClusterXML
 
             addXMLField(doc, rootNode, "exec", FijiArchipelago.getExecRoot());
             addXMLField(doc, rootNode, "file", FijiArchipelago.getFileRoot());
-            addXMLField(doc, rootNode, "default-exec", nm.getDefaultParameters().getExecRoot());
-            addXMLField(doc, rootNode, "default-file", nm.getDefaultParameters().getFileRoot());
-            addXMLField(doc, rootNode, "default-user", nm.getDefaultParameters().getUser());
+            addXMLField(doc, rootNode, "default-exec", paramFactory.getDefaultExecRoot());
+            addXMLField(doc, rootNode, "default-file", paramFactory.getDefaultFileRoot());
+            addXMLField(doc, rootNode, "default-user", paramFactory.getDefaultUser());
 
             clusterXML.appendChild(rootNode);
 
-            for (NodeManager.NodeParameters np : params)
+            for (NodeParameters np : params)
             {
                 final Element clusterNode = doc.createElement("ClusterNode");
                 final Element shellParams = doc.createElement("ShellParameters");
@@ -184,7 +186,7 @@ public class ClusterXML
         {
             try
             {
-                cluster.addNodeToStart(xmlToNodeParameter(cluster, (Element) clusterNodes.item(i)));
+                cluster.startNode(xmlToNodeParameter(cluster, (Element) clusterNodes.item(i)));
             }
             catch (Exception e)
             {
@@ -202,13 +204,13 @@ public class ClusterXML
         return ok;
     }
 
-    private static NodeManager.NodeParameters xmlToNodeParameter(
+    private static NodeParameters xmlToNodeParameter(
             final Cluster cluster, final Element node) throws Exception
     {
-        final NodeManager.NodeParameters nodeParam = cluster.getNodeManager().newParam();
+        final NodeParameters nodeParam =
+                cluster.getParametersFactory().getNewParameters(getXMLField(node, "host"));
         NodeShellParameters shellParams;
 
-        nodeParam.setHost(getXMLField(node, "host"));
         nodeParam.setUser(getXMLField(node, "user"));
         nodeParam.setExecRoot(getXMLField(node, "exec"));
         nodeParam.setFileRoot(getXMLField(node, "file"));

@@ -21,6 +21,8 @@ package edu.utexas.clm.archipelago.ui;
 import edu.utexas.clm.archipelago.Cluster;
 import edu.utexas.clm.archipelago.FijiArchipelago;
 import edu.utexas.clm.archipelago.network.node.NodeManager;
+import edu.utexas.clm.archipelago.network.node.NodeParameters;
+import edu.utexas.clm.archipelago.network.node.NodeParametersFactory;
 import edu.utexas.clm.archipelago.network.shell.NodeShell;
 import edu.utexas.clm.archipelago.network.shell.NodeShellParameters;
 import ij.gui.GenericDialog;
@@ -45,10 +47,10 @@ public class NodeConfigurationUI extends Panel implements ActionListener
         private final Choice shellChoice;
         private final Collection<NodeShell> shells;
         private NodeShellParameters currentShellParam, lastShellParam;
-        private final NodeManager.NodeParameters nodeParam;
+        private final NodeParameters nodeParam;
         private final Panel shellChoicePanel;
         
-        public NodeShellPanel(NodeManager.NodeParameters param)
+        public NodeShellPanel(NodeParameters param)
         {
             nodeParam = param;
             parameterMap = new Hashtable<String, NodeShellParameters>();
@@ -209,9 +211,9 @@ public class NodeConfigurationUI extends Panel implements ActionListener
         public int cpuLimit;
         public String user;
         public NodeShellParameters shellParams;
-        public final NodeManager.NodeParameters param;
+        public final NodeParameters param;
        
-        public NodePanel(NodeManager.NodeParameters param)
+        public NodePanel(NodeParameters param)
         {
             this.param = param;
             label = new Label();
@@ -307,21 +309,21 @@ public class NodeConfigurationUI extends Panel implements ActionListener
             return gd.wasOKed();
         }
 
-        public NodeManager.NodeParameters getNodeParam()
+        public NodeParameters getNodeParam()
         {
             return param;
         }
     }
 
     
-    private final NodeManager manager;
+    private final NodeParametersFactory paramFactory;
     private final Vector<NodePanel> nodePanels;
     private final Vector<Long> removedNodes;
     private final Panel centralPanel;
     
     
     
-    private NodeConfigurationUI(NodeManager nm, Collection<NodeManager.NodeParameters> nodeParams)
+    private NodeConfigurationUI(NodeParametersFactory factory, Collection<NodeParameters> nodeParams)
     {
         super();
         centralPanel = new Panel();
@@ -331,7 +333,7 @@ public class NodeConfigurationUI extends Panel implements ActionListener
         
         nodePanels = new Vector<NodePanel>();
         removedNodes = new Vector<Long>();
-        manager = nm;
+        paramFactory = factory;
         
         super.setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         super.add(pane);
@@ -350,7 +352,7 @@ public class NodeConfigurationUI extends Panel implements ActionListener
         addButton.setMaximumSize(new Dimension(480, 48));
         addButton.setMinimumSize(new Dimension(480, 48));
 
-        for (NodeManager.NodeParameters p : nodeParams)
+        for (NodeParameters p : nodeParams)
         {
             addNode(p);                        
         }
@@ -358,7 +360,7 @@ public class NodeConfigurationUI extends Panel implements ActionListener
         super.validate();
     }
 
-    private NodePanel addNode(final NodeManager.NodeParameters p)
+    private NodePanel addNode(final NodeParameters p)
     {
         NodePanel panel = new NodePanel(p);
         nodePanels.add(panel);
@@ -378,7 +380,7 @@ public class NodeConfigurationUI extends Panel implements ActionListener
 
     public void actionPerformed(final ActionEvent actionEvent)
     {
-        final NodePanel np = addNode(manager.newParam());
+        final NodePanel np = addNode(paramFactory.getNewParameters(""));
         if (!np.doEdit())
         {
             removeNodePanel(np);
@@ -390,8 +392,8 @@ public class NodeConfigurationUI extends Panel implements ActionListener
     {
         FijiArchipelago.debug("nodeConfigurationUI called");
         final GenericDialog gd = new GenericDialog("Cluster Nodes");
-        final ArrayList<NodeManager.NodeParameters> existingParameters = cluster.getNodeParameters();
-        NodeConfigurationUI ui = new NodeConfigurationUI(cluster.getNodeManager(), existingParameters);
+        final ArrayList<NodeParameters> existingParameters = cluster.getNodeParameters();
+        NodeConfigurationUI ui = new NodeConfigurationUI(cluster.getParametersFactory(), existingParameters);
         gd.addPanel(ui);
         gd.showDialog();
 
@@ -401,19 +403,12 @@ public class NodeConfigurationUI extends Panel implements ActionListener
 
             for (NodePanel np : ui.nodePanels)
             {
-                final NodeManager.NodeParameters param = np.getNodeParam();
+                final NodeParameters param = np.getNodeParam();
                 if (!existingParameters.contains(param))
                 {
-                    cluster.addNodeToStart(param);
+                    cluster.startNode(param);
                 }
             }
-            
-            for (long id : ui.removedNodes)
-            {
-                cluster.removeNode(id);
-            }
-
-
         }
     }
 }

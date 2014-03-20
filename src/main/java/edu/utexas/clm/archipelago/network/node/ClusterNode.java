@@ -148,6 +148,8 @@ public class ClusterNode implements TransceiverListener
         xc.queueMessage(MessageType.GETID);
 
         doSyncEnvironment();
+
+        xc.setHostname(getHost());
         setState(ClusterNodeState.ACTIVE);
     }
 
@@ -394,10 +396,42 @@ public class ClusterNode implements TransceiverListener
     {
         return ramMBTot.get();
     }
-    
+
+    /**
+     * Like close, but indicates that the Cluster encountered a problem.
+     */
+    public synchronized void fail()
+    {
+        if (state != ClusterNodeState.STOPPED && state != ClusterNodeState.FAILED)
+        {
+            FijiArchipelago.debug("Setting state");
+
+            setState(ClusterNodeState.FAILED);
+
+            FijiArchipelago.debug("Sending shutdown");
+
+            sendShutdown();
+
+            for (ProcessManager pm : new ArrayList<ProcessManager>(runningProcesses.values()))
+            {
+                removeProcess(pm);
+            }
+
+            FijiArchipelago.debug("Closing XC");
+
+            xc.close();
+
+            FijiArchipelago.debug("Node: Fail finished");
+        }
+        else
+        {
+            FijiArchipelago.debug("Node: Fail() called, but I'm already stopped");
+        }
+    }
+
     public synchronized void close()
     {        
-        if (state != ClusterNodeState.STOPPED)            
+        if (state != ClusterNodeState.STOPPED && state != ClusterNodeState.FAILED)
         {
             FijiArchipelago.debug("Setting state");
 
@@ -441,6 +475,8 @@ public class ClusterNode implements TransceiverListener
                 return "inactive";
             case STOPPED:
                 return "stopped";
+            case FAILED:
+                return "failed";
             default:
                 return "unknown";
         }

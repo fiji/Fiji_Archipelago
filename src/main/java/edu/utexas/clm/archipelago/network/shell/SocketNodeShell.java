@@ -24,6 +24,7 @@ import edu.utexas.clm.archipelago.FijiArchipelago;
 import edu.utexas.clm.archipelago.exception.ShellExecutionException;
 import edu.utexas.clm.archipelago.listen.NodeShellListener;
 import edu.utexas.clm.archipelago.network.node.NodeManager;
+import edu.utexas.clm.archipelago.network.node.NodeParameters;
 import edu.utexas.clm.archipelago.network.server.ArchipelagoServer;
 import edu.utexas.clm.archipelago.network.shell.ssh.JSchUtility;
 
@@ -42,7 +43,7 @@ public class SocketNodeShell extends SSHNodeShell
                 " 2>&1 > ~/" + param.getHost() + "_" + param.getID() + ".log";    
     }
 
-    public boolean startShell(final NodeManager.NodeParameters param, final NodeShellListener listener)
+    public boolean startShell(final NodeParameters param, final NodeShellListener listener)
             throws ShellExecutionException
     {
         FijiArchipelago.debug("Starting Socket shell on " + param.getHost());
