@@ -174,7 +174,7 @@ public class ClusterUI implements ClusterStateListener, ArchipelagoUI
             }
             else if (ae.getActionCommand().equals("server-start"))
             {
-                server = ArchipelagoServer.getServer(cluster);
+                server = ArchipelagoServer.getServer(cluster.getNodeCoordinator());
                 if (!server.active())
                 {
                     server.start();
@@ -261,7 +261,7 @@ public class ClusterUI implements ClusterStateListener, ArchipelagoUI
                 clusterLabel.update(clusterStateString());
                 queueLabel.update(cluster.getQueuedJobCount());
                 runningLabel.update(cluster.getRunningJobCount());
-                nodesLabel.update(cluster.getRunningNodeCount());
+                nodesLabel.update(cluster.countReadyNodes());
 
                 switch(state)
                 {

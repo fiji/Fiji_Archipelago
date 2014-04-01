@@ -275,7 +275,7 @@ public class ClusterNodeStatusUI implements ActionListener
     
     public synchronized void stateChanged()
     {
-        final List<ClusterNode> nodes = cluster.getNodes();
+        final Set<ClusterNode> nodes = cluster.getNodes();
         final Set<Long> keySet = nodeTable.keySet(); 
         
         for (ClusterNode node : nodes)
