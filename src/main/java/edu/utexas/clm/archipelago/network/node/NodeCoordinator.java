@@ -4,6 +4,7 @@ import edu.utexas.clm.archipelago.Cluster;
 import edu.utexas.clm.archipelago.FijiArchipelago;
 import edu.utexas.clm.archipelago.data.ClusterMessage;
 import edu.utexas.clm.archipelago.exception.ShellExecutionException;
+import edu.utexas.clm.archipelago.listen.ClusterStateListener;
 import edu.utexas.clm.archipelago.listen.MessageType;
 import edu.utexas.clm.archipelago.listen.NodeShellListener;
 import edu.utexas.clm.archipelago.listen.NodeStateListener;
@@ -27,7 +28,7 @@ import java.util.concurrent.locks.ReentrantLock;
 /**
  *
  */
-public class NodeCoordinator implements NodeStateListener, NodeShellListener
+public class NodeCoordinator implements NodeStateListener, NodeShellListener, ClusterStateListener
 {
     private class NodeInitializer implements TransceiverListener
     {
@@ -51,6 +52,7 @@ public class NodeCoordinator implements NodeStateListener, NodeShellListener
             xc = new MessageXC(is, os, this, tel);
             xc.queueMessage(MessageType.GETID);
 
+            FijiArchipelago.debug("NodeInitializer: leaving constrructor");
         }
 
         private void cleanup()
@@ -66,7 +68,7 @@ public class NodeCoordinator implements NodeStateListener, NodeShellListener
             if (!isVolunteer.getAndSet(true))
             {
                 nodeId = FijiArchipelago.getUniqueID();
-
+                xc.setId(nodeId);
                 xc.queueMessage(MessageType.SETID, nodeId);
                 xc.queueMessage(MessageType.HOSTNAME);
                 xc.queueMessage(MessageType.USER);
@@ -81,7 +83,7 @@ public class NodeCoordinator implements NodeStateListener, NodeShellListener
                 final ClusterNode node;
                 final NodeParameters params;
 
-                xc.softClose();
+
 
                 params = new NodeParameters(userName, hostName, new DummyNodeShell(), execRoot, "");
                 node = new ClusterNode(params, tel);
@@ -128,13 +130,17 @@ public class NodeCoordinator implements NodeStateListener, NodeShellListener
                 {
                     case GETID:
                         long id = (Long)object;
+
+                        FijiArchipelago.debug("Node initializer: got id " + id);
+
                         if (id > 0)
                         {
                             ClusterNode node = getNode(id);
                             if (node != null)
                             {
-                                node.setIOStreams(is, os);
-                                xc.softClose();
+                                FijiArchipelago.debug("Found an existing node, setting streams");
+                                xc.setId(id);
+                                node.setMessageXC(xc);
                                 cleanup();
                             }
                             else
@@ -175,18 +181,7 @@ public class NodeCoordinator implements NodeStateListener, NodeShellListener
                         break;
                 }
             }
-            catch(IOException ioe)
-            {
-                //TODO
-            }
-            catch (TimeoutException te)
-            {
-                //TODO
-            }
-            catch (InterruptedException ie)
-            {
-                //TODO
-            }
+
             catch (ClassCastException cce)
             {
                 //TODO
@@ -201,6 +196,8 @@ public class NodeCoordinator implements NodeStateListener, NodeShellListener
     private final Vector<Bottler> bottlers;
 
     private final Vector<NodeInitializer> nodeInitializers;
+
+    private final Vector<Thread> nodeStartThreads;
 
     private final Cluster cluster;
 
@@ -221,6 +218,7 @@ public class NodeCoordinator implements NodeStateListener, NodeShellListener
 
         bottlers = new Vector<Bottler>();
         nodeInitializers = new Vector<NodeInitializer>();
+        nodeStartThreads = new Vector<Thread>();
 
         tel = new TransceiverExceptionListener() {
             public void handleRXThrowable(Throwable t, MessageXC mxc, ClusterMessage message)
@@ -232,6 +230,7 @@ public class NodeCoordinator implements NodeStateListener, NodeShellListener
             }
         };
 
+        cluster.addStateListener(this);
     }
 
     private void nodeInitializerDone(final NodeInitializer ni)
@@ -244,20 +243,29 @@ public class NodeCoordinator implements NodeStateListener, NodeShellListener
             final ClusterNodeState stateNow,
             final ClusterNodeState lastState)
     {
-        nodeLock.lock();
 
+        nodeLock.lock();
         allNodes.add(node);
+        nodeLock.unlock();
 
         switch(stateNow)
         {
             case WAITING:
+                nodeLock.lock();
                 waitingNodes.add(node);
+                nodeLock.unlock();
                 break;
 
             case ACTIVE:
+                nodeLock.lock();
                 FijiArchipelago.debug("Got state change to active for " + node.getHost());
+
                 waitingNodes.remove(node);
                 runningNodes.add(node);
+
+                nodeLock.unlock();
+
+                cluster.nodeStarted();
 
                 for (final Bottler bottler : bottlers)
                 {
@@ -268,11 +276,13 @@ public class NodeCoordinator implements NodeStateListener, NodeShellListener
 
             case STOPPED:
             case FAILED:
+                nodeLock.lock();
                 FijiArchipelago.debug("Got state change to " + ClusterNode.stateString(stateNow) +
                         " for " + node.getHost());
 
                 runningNodes.remove(node);
                 waitingNodes.remove(node);
+                nodeLock.unlock();
 
                 cluster.nodeStopped(node, runningNodes.size());
                 break;
@@ -280,24 +290,39 @@ public class NodeCoordinator implements NodeStateListener, NodeShellListener
 
         cluster.triggerListeners();
 
-        nodeLock.unlock();
+
     }
+
+
+    public void stateChanged(Cluster cluster)
+    {
+        if (cluster.getState() == Cluster.ClusterState.STARTED ||
+                cluster.getState() == Cluster.ClusterState.RUNNING)
+        {
+            nodeLock.lock();
+
+            for (final Thread t : nodeStartThreads)
+            {
+                t.start();
+            }
+
+            nodeStartThreads.clear();
+
+            nodeLock.unlock();
+        }
+    }
+
 
     public void startNode(final NodeParameters params)
     {
         final ClusterNode node = new ClusterNode(params, tel);
+
         startNode(node);
     }
 
     public void startNode(final ClusterNode node)
     {
-        nodeLock.lock();
-        allNodes.add(node);
-        nodeLock.unlock();
-
-        node.addListener(this);
-
-        new Thread()
+        final Thread t = new Thread()
         {
             public void run()
             {
@@ -311,7 +336,27 @@ public class NodeCoordinator implements NodeStateListener, NodeShellListener
                 }
             }
 
-        }.start();
+        };
+
+        nodeLock.lock();
+        allNodes.add(node);
+
+        if (cluster.getState() == Cluster.ClusterState.RUNNING ||
+            cluster.getState() == Cluster.ClusterState.STARTED)
+        {
+            t.start();
+        }
+        else
+        {
+            nodeStartThreads.add(t);
+        }
+
+        nodeLock.unlock();
+
+        FijiArchipelago.debug("NodeCoordinator started node " + node);
+        Thread.dumpStack();
+
+        node.addListener(this);
     }
 
     public Set<ClusterNode> getNodes()

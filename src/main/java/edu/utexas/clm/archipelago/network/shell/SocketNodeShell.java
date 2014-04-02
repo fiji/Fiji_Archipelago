@@ -23,7 +23,6 @@ import edu.utexas.clm.archipelago.Cluster;
 import edu.utexas.clm.archipelago.FijiArchipelago;
 import edu.utexas.clm.archipelago.exception.ShellExecutionException;
 import edu.utexas.clm.archipelago.listen.NodeShellListener;
-import edu.utexas.clm.archipelago.network.node.NodeManager;
 import edu.utexas.clm.archipelago.network.node.NodeParameters;
 import edu.utexas.clm.archipelago.network.server.ArchipelagoServer;
 import edu.utexas.clm.archipelago.network.shell.ssh.JSchUtility;
@@ -32,10 +31,9 @@ public class SocketNodeShell extends SSHNodeShell
 {
     private static final SocketNodeShell shell = new SocketNodeShell();
 
-    protected String getArguments(final NodeManager.NodeParameters param,
+    protected String getArguments(final NodeParameters param,
                                   final NodeShellListener listener)
     {
-        final String eroot = param.getExecRoot();
         final ArchipelagoServer server = ArchipelagoServer.getServer(listener);
         return "--allow-multiple --full-classpath " +
                 " --main-class edu.utexas.clm.archipelago.Fiji_Archipelago " +

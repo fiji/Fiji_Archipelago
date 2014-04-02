@@ -3,7 +3,6 @@ package edu.utexas.clm.archipelago.ui;
 
 import edu.utexas.clm.archipelago.Cluster;
 import edu.utexas.clm.archipelago.FijiArchipelago;
-import edu.utexas.clm.archipelago.network.node.NodeManager;
 import edu.utexas.clm.archipelago.network.node.NodeParameters;
 import edu.utexas.clm.archipelago.network.node.NodeParametersFactory;
 import edu.utexas.clm.archipelago.network.shell.NodeShellParameters;

@@ -31,13 +31,13 @@ import edu.utexas.clm.archipelago.network.translation.FileTranslator;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.ConcurrentModificationException;
 import java.util.List;
 import java.util.Vector;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Message transceiver class
@@ -129,7 +129,9 @@ public class MessageXC
                             FijiArchipelago.debug("RX: Got message for job " + pm.getID());
                         }
                     }
+                    listenerLock.lock();
                     xcListener.handleMessage(message);
+                    listenerLock.unlock();
                 }
                 /*catch (ClassCastException cce)
                 {
@@ -245,11 +247,12 @@ public class MessageXC
     private final AtomicLong lastSentID;
     private final long waitTime;
     private final TimeUnit tUnit;
-    private final TransceiverListener xcListener;
+    private TransceiverListener xcListener;
     private final TransceiverExceptionListener xcExceptionListener;
     private final OutputStream outStream;
     private final InputStream inStream;
     private long id;
+    private final ReentrantLock listenerLock;
 
     private final MessageXC xc = this;
 
@@ -284,6 +287,8 @@ public class MessageXC
         xcListener = listener;
         xcExceptionListener = listenerE;
 
+        listenerLock = new ReentrantLock();
+
         host = "Unknown host";
 
         txThread = new TXThread();
@@ -309,7 +314,9 @@ public class MessageXC
         {
             FijiArchipelago.debug("XC: Got close.");
             active.set(false);
+            listenerLock.lock();
             xcListener.streamClosed();
+            listenerLock.unlock();
             txThread.interrupt();
             rxThread.interrupt();
             try
@@ -325,18 +332,11 @@ public class MessageXC
         }
     }
 
-    /**
-     * Soft shutdown, in other words, stop listening to the IO streams, but leave them open.
-     */
-    public void softClose()
+    public void setListener(final TransceiverListener listener)
     {
-        if (active.get())
-        {
-            FijiArchipelago.debug("XC: Soft close.");
-            active.set(false);
-            txThread.interrupt();
-            rxThread.interrupt();
-        }
+        // Normally this would be locked, but this function should only be called from inside
+        // handleMessage, in which case, we're already locked.
+        xcListener = listener;
     }
 
     public boolean join()

@@ -20,7 +20,6 @@ package edu.utexas.clm.archipelago.ui;
 
 import edu.utexas.clm.archipelago.Cluster;
 import edu.utexas.clm.archipelago.FijiArchipelago;
-import edu.utexas.clm.archipelago.network.node.NodeManager;
 import edu.utexas.clm.archipelago.network.node.NodeParameters;
 import edu.utexas.clm.archipelago.network.node.NodeParametersFactory;
 import edu.utexas.clm.archipelago.network.shell.NodeShell;
@@ -330,7 +329,9 @@ public class NodeConfigurationUI extends Panel implements ActionListener
         final ScrollPane pane = new ScrollPane();        
         final Button addButton = new Button("Add Node...");
         //final Dimension panelSize = new Dimension(512, 256);
-        
+
+        FijiArchipelago.debug("NodeConfigUI got " + nodeParams.size() + " existing parameters");
+
         nodePanels = new Vector<NodePanel>();
         removedNodes = new Vector<Long>();
         paramFactory = factory;

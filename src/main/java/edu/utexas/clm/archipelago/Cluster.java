@@ -23,10 +23,8 @@ import edu.utexas.clm.archipelago.compute.*;
 import edu.utexas.clm.archipelago.data.ClusterMessage;
 import edu.utexas.clm.archipelago.listen.ClusterStateListener;
 import edu.utexas.clm.archipelago.listen.MessageType;
-import edu.utexas.clm.archipelago.listen.ProcessListener;
 import edu.utexas.clm.archipelago.network.MessageXC;
 import edu.utexas.clm.archipelago.network.node.ClusterNode;
-import edu.utexas.clm.archipelago.network.node.ClusterNodeState;
 import edu.utexas.clm.archipelago.network.node.NodeCoordinator;
 import edu.utexas.clm.archipelago.network.node.NodeParameters;
 import edu.utexas.clm.archipelago.network.node.NodeParametersFactory;
@@ -50,7 +48,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.ConcurrentModificationException;
 import java.util.HashMap;
-import java.util.Hashtable;
 import java.util.List;
 import java.util.Set;
 import java.util.Vector;
@@ -412,6 +409,7 @@ public class Cluster
     public static boolean initializedCluster()
     {
         ClusterState state = cluster == null ? null : cluster.getState();
+        FijiArchipelago.debug("Main cluster state is " + stateString(state));
         return !(cluster == null ||
                 state == ClusterState.STOPPING ||
                 state == ClusterState.STOPPED);
@@ -468,6 +466,11 @@ public class Cluster
 
     public static String stateString(final ClusterState s)
     {
+        if (s == null)
+        {
+            return "Nothing";
+        }
+
         switch (s)
         {
             case INSTANTIATED:
@@ -584,8 +587,6 @@ public class Cluster
         
 //        jobCount = new AtomicInteger(0);
 
-        nodeCoordinator = new NodeCoordinator(this);
-
         xcEListener = new XCErrorAdapter()
         {
             public boolean handleCustom(final Throwable t, final MessageXC mxc,
@@ -684,7 +685,9 @@ public class Cluster
             localHostName = "localhost";
             FijiArchipelago.err("Could not get canonical host name for local machine. Using localhost instead");
         }
-        
+
+        nodeCoordinator = new NodeCoordinator(this);
+
         addBottler(new FileBottler());
     }
 
@@ -705,6 +708,12 @@ public class Cluster
         FijiArchipelago.debug("Cluster: State changed from " + stateString(getState()) +
                 " to " + stateString(state));        
         this.state.set(stateEnumToInt(state));
+
+        if (getState() == ClusterState.RUNNING)
+        {
+            scheduler.start();
+        }
+
         triggerListeners();
     }
 
@@ -935,8 +944,14 @@ public class Cluster
         if (getState() == ClusterState.INITIALIZED)
         {
             FijiArchipelago.debug("Scheduler alive? :" + scheduler.isAlive());
-            scheduler.start();
-            setState(ClusterState.STARTED);
+            if (nodeCoordinator.numRunningNodes() > 0)
+            {
+                setState(ClusterState.RUNNING);
+            }
+                else
+            {
+                setState(ClusterState.STARTED);
+            }
         }
     }
 
@@ -1029,6 +1044,14 @@ public class Cluster
         }
 
         FijiArchipelago.debug("There are now " + nRunningNodes + " running nodes");
+    }
+
+    public void nodeStarted()
+    {
+        if (getState() == ClusterState.STARTED)
+        {
+            setState(ClusterState.RUNNING);
+        }
     }
 
     public boolean isShutdown()
@@ -1151,6 +1174,18 @@ public class Cluster
     public int numRegisteredUIs()
     {
         return registeredUIs.size();
+    }
+
+    public String toString()
+    {
+        if (this == cluster)
+        {
+            return "THE cluster";
+        }
+        else
+        {
+            return "a cluster";
+        }
     }
 
     public static boolean isClusterService(final ExecutorService es)
