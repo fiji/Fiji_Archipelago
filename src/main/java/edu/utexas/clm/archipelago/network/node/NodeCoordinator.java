@@ -332,6 +332,21 @@ public class NodeCoordinator implements NodeStateListener, NodeShellListener
         return nodesOut;
     }
 
+    public Set<ClusterNode> getAvailableNodes()
+    {
+        HashSet<ClusterNode> nodesOut = new HashSet<ClusterNode>();
+        nodeLock.lock();
+        for (final ClusterNode node : runningNodes)
+        {
+            if (node.numAvailableThreads() > 0)
+            {
+                nodesOut.add(node);
+            }
+        }
+        nodeLock.unlock();
+        return nodesOut;
+    }
+
     public int numRunningNodes()
     {
         int n;

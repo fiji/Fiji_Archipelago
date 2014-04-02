@@ -128,5 +128,10 @@ public class ProcessManager<T> implements Runnable, Serializable
     {
         return requestedCores(node.getThreadLimit());
     }
+
+    public boolean equals(Object o)
+    {
+        return (o instanceof ProcessManager) && ((ProcessManager)o).getID() == getID();
+    }
     
 }

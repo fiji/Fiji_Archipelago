@@ -36,7 +36,6 @@
 
 package edu.utexas.clm.archipelago.compute;
 
-import edu.utexas.clm.archipelago.Cluster;
 import edu.utexas.clm.archipelago.FijiArchipelago;
 import edu.utexas.clm.archipelago.network.node.ClusterNode;
 
@@ -53,7 +52,7 @@ public class ArchipelagoFuture<T> implements Future<T>
 {
     private T t;
     private final long id;
-    private final Cluster.ProcessScheduler scheduler;
+    private final Scheduler scheduler;
     private final AtomicBoolean wasCancelled, done, finished;
     private final Vector<Thread> waitingThreads;
     private final ReentrantLock threadLock;
@@ -61,12 +60,12 @@ public class ArchipelagoFuture<T> implements Future<T>
     private ClusterNode ranOnNode = null;
    
     
-    public ArchipelagoFuture(Cluster.ProcessScheduler scheduler)
+    public ArchipelagoFuture(Scheduler scheduler)
     {
         this(scheduler, null);
     }
     
-    public ArchipelagoFuture(Cluster.ProcessScheduler s, T inData)
+    public ArchipelagoFuture(Scheduler s, T inData)
     {
         id = FijiArchipelago.getUniqueID();
         t = inData;
@@ -118,7 +117,7 @@ public class ArchipelagoFuture<T> implements Future<T>
                 {
                     t = result;
                 }
-                ranOnNode = scheduler.getNode(pm.getRunningOn());
+                ranOnNode = scheduler.getNode(pm);
                 e = pm.getRemoteException();
                 done.set(true);
                 // MUST set done to true before interrupting threads, or we'll get a bunch of
