@@ -885,7 +885,7 @@ public class Cluster
 
     public synchronized void jobFinished()
     {
-        int nJobs = scheduler.numRunnningJobs();
+        int nJobs = scheduler.numRunningJobs();
 
         triggerListeners();
 
@@ -957,7 +957,7 @@ public class Cluster
 
     public int getRunningJobCount()
     {
-        return scheduler.numRunnningJobs();
+        return scheduler.numRunningJobs();
     }
     
     public int getQueuedJobCount()
@@ -1114,7 +1114,7 @@ public class Cluster
             node.setActive(false);
         }
 
-        if (scheduler.numRunnningJobs() <= 0)
+        if (scheduler.numRunningJobs() <= 0)
         {
             haltFinished();
         }

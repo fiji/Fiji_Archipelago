@@ -240,15 +240,30 @@ public class ClusterNode implements TransceiverListener
 
     public boolean submit(final ProcessManager<?> process, final ProcessListener listener)
     {
+
+        FijiArchipelago.debug("ClusterNode: " + getHost() + " got submit for " + process.getID());
         if (isReady())
         {
             if (processHandlers.get(process.getID()) == null)
             {
-                processHandlers.put(process.getID(), listener);
-                runningProcesses.put(process.getID(), process);
-                process.setRunningOn(this);
-                runningCores.addAndGet(process.requestedCores(this));
-                return xc.queueMessage(MessageType.PROCESS, process);
+                if (xc.queueMessage(MessageType.PROCESS, process))
+                {
+                    int nCore = process.requestedCores(this);
+
+                    processHandlers.put(process.getID(), listener);
+                    runningProcesses.put(process.getID(), process);
+                    process.setRunningOn(this);
+                    runningCores.addAndGet(nCore);
+                    FijiArchipelago.debug("ClusterNode: Placing process " + process.getID() +
+                            " on xc queue");
+                    return true;
+                }
+                else
+                {
+                    FijiArchipelago.debug("ClusterNode: Process " + process.getID() +
+                            " rejected from queue");
+                    return false;
+                }
             }
             else
             {
@@ -259,6 +274,7 @@ public class ClusterNode implements TransceiverListener
         }
         else
         {
+            FijiArchipelago.debug("ClusterNode: " + getHost() + " is not ready yet");
             return false;
         }
     }
@@ -313,10 +329,16 @@ public class ClusterNode implements TransceiverListener
                 case PROCESS:
                     ProcessManager<?> pm = (ProcessManager<?>)object;
                     ProcessListener listener = processHandlers.remove(pm.getID());
+                    FijiArchipelago.debug("ClusterNode: " + getHost() + " got result for " +
+                            pm.getID());
+
                     removeProcess(pm);
                     //runningProcesses.remove(pm.getID());
 
                     listener.processFinished(pm);
+
+                    FijiArchipelago.debug("ClusterNode: " + getHost() + " listener returned for " +
+                            pm.getID());
                     break;
 
                 case NUMTHREADS:

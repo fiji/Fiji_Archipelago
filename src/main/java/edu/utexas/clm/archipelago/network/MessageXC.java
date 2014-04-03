@@ -33,7 +33,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Vector;
-import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -237,7 +237,7 @@ public class MessageXC
     public static final TimeUnit DEFAULT_UNIT = TimeUnit.MILLISECONDS;
 
     private final List<Bottler> bottlers;
-    private final ArrayBlockingQueue<ClusterMessage> messageQ;
+    private final LinkedBlockingQueue<ClusterMessage> messageQ;
     private BottlingOutputStream objectOutputStream;
     private BottlingInputStream objectInputStream;
     private FileTranslator fileTranslator;
@@ -274,7 +274,7 @@ public class MessageXC
         FijiArchipelago.debug("Creating Message Transciever");
         fileTranslator = new NullFileTranslator();
         bottlers = Collections.synchronizedList(new Vector<Bottler>());
-        messageQ = new ArrayBlockingQueue<ClusterMessage>(16, true);
+        messageQ = new LinkedBlockingQueue<ClusterMessage>();
         objectOutputStream = new BottlingOutputStream(outStream);
         objectInputStream =  new BottlingInputStream(inStream);
         FijiArchipelago.debug("XC: streams are set");
@@ -364,11 +364,14 @@ public class MessageXC
     {
         try
         {
+            FijiArchipelago.debug("TX: queuing message " + message.type);
             messageQ.put(message);
+            FijiArchipelago.debug("TX: queued successfully");
             return true;
         }
         catch (InterruptedException ie)
         {
+            FijiArchipelago.debug("TX: message rejected: " + ie.getCause());
             return false;
         }
     }

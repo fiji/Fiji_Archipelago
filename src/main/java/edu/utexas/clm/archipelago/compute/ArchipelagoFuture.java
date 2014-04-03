@@ -108,6 +108,8 @@ public class ArchipelagoFuture<T> implements Future<T>
         threadLock.lock();
         if (!finished.getAndSet(true))
         {
+            FijiArchipelago.debug("Future " + id + ": finishing future ");
+
             if (pm != null)
             {
                 final Object o = pm.getOutput();
@@ -122,10 +124,12 @@ public class ArchipelagoFuture<T> implements Future<T>
                 done.set(true);
                 // MUST set done to true before interrupting threads, or we'll get a bunch of
                 // InterruptedExceptions on get()
+                FijiArchipelago.debug("Future " + id + ": finished ok. smooching threads");
                 smoochThreads();
             }
             else
             {
+                FijiArchipelago.debug("Future " + id + ": given null pm");
                 t = null;
             }
             threadLock.unlock();
@@ -133,6 +137,7 @@ public class ArchipelagoFuture<T> implements Future<T>
         }
         else
         {
+            FijiArchipelago.debug("Future " + id + ": already finished");
             threadLock.unlock();
             return false;
         }

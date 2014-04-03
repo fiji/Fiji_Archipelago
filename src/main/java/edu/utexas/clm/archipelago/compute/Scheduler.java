@@ -31,8 +31,8 @@ public class Scheduler extends Thread implements ProcessListener
     private final LinkedList<ProcessManager<?>> normalQueue, priorityQueue,
             internalPriorityQueue, internalNormalQueue;
 
-    private final AtomicBoolean running, checkJobs;
-    private final AtomicInteger pauseTime;
+    private final AtomicBoolean running, okToSleep, ateAnApple;
+    private final AtomicInteger pauseTime, nRunningJobs, nQueuedJobs;
 
     // Lock rules:
     // If you must lock multiple locks at the same time:
@@ -56,8 +56,11 @@ public class Scheduler extends Thread implements ProcessListener
         internalNormalQueue = new LinkedList<ProcessManager<?>>();
         internalPriorityQueue = new LinkedList<ProcessManager<?>>();
         running = new AtomicBoolean(false);
-        checkJobs = new AtomicBoolean(false);
+        okToSleep = new AtomicBoolean(false);
+        ateAnApple = new AtomicBoolean(false);
         pauseTime = new AtomicInteger(DEFAULT_PAUSE_MS);
+        nRunningJobs = new AtomicInteger(0);
+        nQueuedJobs = new AtomicInteger(0);
         queueLock = new ReentrantLock();
         schedulerLock = new ReentrantLock();
         futureLock = new ReentrantLock();
@@ -113,6 +116,8 @@ public class Scheduler extends Thread implements ProcessListener
                     FijiArchipelago.debug("Scheduler: submitting job " + pm.getID() +
                             " to node " + node.getHost());
                     runningProcesses.put(pm.getID(), pm);
+                    nRunningJobs.set(runningProcesses.size());
+                    nQueuedJobs.decrementAndGet();
 
                     if (node.numAvailableThreads() <= 0)
                     {
@@ -132,13 +137,31 @@ public class Scheduler extends Thread implements ProcessListener
 
     private void spawnPoke()
     {
-        new Thread()
+        wake();
+    }
+
+    private void updateQueueSize()
+    {
+        int n = internalPriorityQueue.size() + internalNormalQueue.size() +
+                normalQueue.size() + priorityQueue.size();
+        nQueuedJobs.set(n);
+    }
+
+    private void doSubmit(final LinkedList<ProcessManager<?>> queue,
+                          final LinkedList<ClusterNode> nodeList)
+    {
+        final ArrayList<ProcessManager<?>> submittedPMs =
+                new ArrayList<ProcessManager<?>>(queue.size());
+        for (final ProcessManager pm : queue)
         {
-            public void run()
+            if (trySubmit(pm, nodeList))
             {
-                poke();
+                submittedPMs.add(pm);
             }
-        }.start();
+            rotate(nodeList);
+        }
+
+        queue.removeAll(submittedPMs);
     }
 
     private boolean queue(final ProcessManager<?> pm, final LinkedList<ProcessManager<?>> queue)
@@ -149,7 +172,7 @@ public class Scheduler extends Thread implements ProcessListener
 
             pm.setRunningOn(null);
             queue.add(pm);
-            checkJobs.set(true);
+            okToSleep.set(true);
             allProcesses.put(pm.getID(), pm);
 
             queueLock.unlock();
@@ -186,21 +209,39 @@ public class Scheduler extends Thread implements ProcessListener
         return future;
     }
 
+    private void wake()
+    {
+        okToSleep.set(false);
+        if (ateAnApple.get())
+        {
+            super.interrupt();
+        }
+    }
+
     public boolean processFinished(ProcessManager<?> process)
     {
         boolean ok = false;
+        FijiArchipelago.debug("Scheduler: Got process finished for " + process.getID());
         futureLock.lock();
         queueLock.lock();
+        FijiArchipelago.debug("Scheduler: process finished: got locks");
 
         if (runningProcesses.remove(process.getID()) != null)
         {
             final ArchipelagoFuture<?> future = futures.remove(process.getID());
 
+            nRunningJobs.set(runningProcesses.size());
+
+            FijiArchipelago.debug("Scheduler: process finished: found process in map");
+
             if (future != null)
             {
+
+                FijiArchipelago.debug("Scheduler: process finished: found future");
                 try
                 {
                     future.finish(process);
+                    FijiArchipelago.debug("Scheduler: process finished: finished future");
                     ok = true;
                 }
                 catch (ClassCastException cce){/**/}
@@ -208,6 +249,8 @@ public class Scheduler extends Thread implements ProcessListener
 
             allProcesses.remove(process.getID());
         }
+
+        FijiArchipelago.debug("Scheduler: process finished: releasing locks and finishing");
 
         queueLock.unlock();
         futureLock.unlock();
@@ -225,6 +268,7 @@ public class Scheduler extends Thread implements ProcessListener
             queueLock.lock();
 
             runningProcesses.remove(id);
+            nRunningJobs.set(runningProcesses.size());
             allProcesses.remove(id);
 
             queueLock.unlock();
@@ -234,35 +278,14 @@ public class Scheduler extends Thread implements ProcessListener
         futureLock.unlock();
     }
 
-    public int numRunnningJobs()
+    public int numRunningJobs()
     {
-        final int n;
-        queueLock.lock();
-
-        n = runningProcesses.size();
-
-        queueLock.unlock();
-
-        return n;
+        return nRunningJobs.get();
     }
 
     public int numQueuedJobs()
     {
-        final int n;
-        FijiArchipelago.debug("Scheduler: num Q acquiring scheduler lock");
-        schedulerLock.lock();
-        FijiArchipelago.debug("Scheduler: num Q got it, acquiring queue lock");
-        queueLock.lock();
-        FijiArchipelago.debug("Scheduler: num Q got it");
-
-        n = internalPriorityQueue.size() + internalNormalQueue.size() +
-                normalQueue.size() + priorityQueue.size();
-
-        FijiArchipelago.debug("Scheduler: num Q releasing locks");
-        queueLock.unlock();
-        schedulerLock.unlock();
-
-        return n;
+        return nQueuedJobs.get();
     }
 
     public <T> ArchipelagoFuture<T> queueNormal(final Callable<T> callable, float np, boolean f)
@@ -294,6 +317,7 @@ public class Scheduler extends Thread implements ProcessListener
         if (runningProcesses.get(pm.getID()).equals(pm))
         {
             runningProcesses.remove(pm.getID());
+            nRunningJobs.set(runningProcesses.size());
             allProcesses.remove(pm.getID());
             ok = true;
         }
@@ -349,6 +373,8 @@ public class Scheduler extends Thread implements ProcessListener
         {
             // If it was queued, then it hasn't been sent to a node yet. All we need to do now is
             // remove the pm from the allProcesses map.
+            updateQueueSize();
+
             allProcesses.remove(id);
             queueLock.unlock();
             schedulerLock.unlock();
@@ -372,6 +398,7 @@ public class Scheduler extends Thread implements ProcessListener
             // Done with futures, so unlock the future lock.
             futureLock.unlock();
 
+            nRunningJobs.set(runningProcesses.size());
             allProcesses.remove(id);
             queueLock.unlock();
 
@@ -401,6 +428,8 @@ public class Scheduler extends Thread implements ProcessListener
         while (running.get())
         {
             final Set<ClusterNode> currentNodes;
+            final ArrayList<ClusterNode> removeList = new ArrayList<ClusterNode>();
+            int level = 0;
 
             FijiArchipelago.debug("Scheduler: run acquiring scheduler lock");
             schedulerLock.lock();
@@ -409,18 +438,18 @@ public class Scheduler extends Thread implements ProcessListener
             // First, update the node list
             currentNodes = cluster.getNodeCoordinator().getAvailableNodes();
 
-            System.out.println("1");
+            System.out.println("Scheduler: " + (level++));
 
             // Remove any nodes in nodeList that aren't in currentNodes
-            for (final ClusterNode node : new ArrayList<ClusterNode>(nodeList))
+            for (final ClusterNode node : nodeList)
             {
                 if (!currentNodes.contains(node))
                 {
-                    nodeList.remove(node);
+                    removeList.add(node);
                 }
             }
 
-            System.out.println("2");
+            nodeList.removeAll(removeList);
 
             // Add any nodes in currentNodes that aren't in nodeList
             for (final ClusterNode node : currentNodes)
@@ -441,9 +470,7 @@ public class Scheduler extends Thread implements ProcessListener
             queueLock.lock();
             FijiArchipelago.debug("Scheduler: run got it");
 
-            checkJobs.set(false);
-
-            System.out.println("A");
+            okToSleep.set(false);
 
             if (!priorityQueue.isEmpty())
             {
@@ -452,8 +479,6 @@ public class Scheduler extends Thread implements ProcessListener
                 Collections.sort(internalPriorityQueue, comparator);
             }
 
-            System.out.println("B");
-
             if (!normalQueue.isEmpty())
             {
                 internalNormalQueue.addAll(normalQueue);
@@ -461,7 +486,7 @@ public class Scheduler extends Thread implements ProcessListener
                 Collections.sort(internalNormalQueue, comparator);
             }
 
-            System.out.println("C");
+            updateQueueSize();
 
             FijiArchipelago.debug("Scheduler: run releasing queue lock");
             queueLock.unlock();
@@ -470,48 +495,41 @@ public class Scheduler extends Thread implements ProcessListener
 
             if (!nodeList.isEmpty())
             {
-                for (final ProcessManager pm : internalPriorityQueue)
-                {
-                    if (trySubmit(pm, nodeList))
-                    {
-                        internalPriorityQueue.remove(pm);
-                    }
-                    rotate(nodeList);
-                }
+                doSubmit(internalPriorityQueue, nodeList);
 
-                for (final ProcessManager pm : internalNormalQueue)
-                {
-                    if (trySubmit(pm, nodeList))
-                    {
-                        internalPriorityQueue.remove(pm);
-                    }
-                    rotate(nodeList);
-                }
+                doSubmit(internalNormalQueue, nodeList);
             }
 
             FijiArchipelago.debug("Scheduler: run releasing scheduler lock");
             schedulerLock.unlock();
 
-            // if checkJobs is true, new jobs have been added since we checked last.
-            if (!checkJobs.getAndSet(false))
+            // if okToSleep is true, new jobs may have been added since we checked last.
+            if (!okToSleep.getAndSet(false))
             {
                 try
                 {
                     // In practice, sleep for only a second or so. This prevents a deadlock that can
                     // occur in rare occasions when we are poke()'d between schedulerLock.unlock() and here.
                     FijiArchipelago.debug("Scheduler: run going to sleep");
+                    ateAnApple.set(true);
                     Thread.sleep(pauseTime.get());
+                    ateAnApple.set(false);
                     FijiArchipelago.debug("Scheduler: run awoke");
                 }
                 catch (InterruptedException ie)
                 {
                     FijiArchipelago.debug("Scheduler: run poked");
+                    ateAnApple.set(false);
                     if (!running.get())
                     {
+                        FijiArchipelago.log("Scheduler: finished. Ending");
+                        FijiArchipelago.debug("Scheduler: finished. Ending");
                         return;
                     }
                 }
             }
+
+            FijiArchipelago.debug("Scheduler: end of run loop");
 
         }
     }
@@ -525,6 +543,8 @@ public class Scheduler extends Thread implements ProcessListener
     public void close()
     {
         running.set(false);
+
+        wake();
 
         queueLock.lock();
 
@@ -549,12 +569,7 @@ public class Scheduler extends Thread implements ProcessListener
 
     public void poke()
     {
-        if (running.get())
-        {
-            schedulerLock.lock();
-            super.interrupt();
-            schedulerLock.unlock();
-        }
+        wake();
     }
 
     public synchronized ArrayList<ProcessManager<?>> getRemainingJobs()
