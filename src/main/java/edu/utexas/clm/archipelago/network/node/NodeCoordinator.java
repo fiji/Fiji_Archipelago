@@ -223,10 +223,14 @@ public class NodeCoordinator implements NodeStateListener, NodeShellListener, Cl
         tel = new TransceiverExceptionListener() {
             public void handleRXThrowable(Throwable t, MessageXC mxc, ClusterMessage message)
             {
+                FijiArchipelago.log("Exception: " + t);
+                FijiArchipelago.debug("Exception: " + t, t);
             }
 
             public void handleTXThrowable(Throwable t, MessageXC mxc, ClusterMessage message)
             {
+                FijiArchipelago.log("Exception: " + t);
+                FijiArchipelago.debug("Exception: " + t, t);
             }
         };
 
@@ -489,6 +493,11 @@ public class NodeCoordinator implements NodeStateListener, NodeShellListener, Cl
         }
 
         nodeLock.unlock();
+    }
+
+    public synchronized ArrayList<Bottler> getBottlers()
+    {
+        return new ArrayList<Bottler>(bottlers);
     }
 
     public ArrayList<NodeParameters> getParameters()

@@ -365,6 +365,11 @@ public class MessageXC
         try
         {
             FijiArchipelago.debug("TX: queuing message " + message.type);
+            if (message.type == MessageType.ERROR)
+            {
+                Throwable t = (Throwable)message.o;
+                t.printStackTrace();
+            }
             messageQ.put(message);
             FijiArchipelago.debug("TX: queued successfully");
             return true;

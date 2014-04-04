@@ -429,7 +429,6 @@ public class Scheduler extends Thread implements ProcessListener
         {
             final Set<ClusterNode> currentNodes;
             final ArrayList<ClusterNode> removeList = new ArrayList<ClusterNode>();
-            int level = 0;
 
             FijiArchipelago.debug("Scheduler: run acquiring scheduler lock");
             schedulerLock.lock();
@@ -437,8 +436,6 @@ public class Scheduler extends Thread implements ProcessListener
 
             // First, update the node list
             currentNodes = cluster.getNodeCoordinator().getAvailableNodes();
-
-            System.out.println("Scheduler: " + (level++));
 
             // Remove any nodes in nodeList that aren't in currentNodes
             for (final ClusterNode node : nodeList)

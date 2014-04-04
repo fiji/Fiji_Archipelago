@@ -931,7 +931,13 @@ public class Cluster
 
     public void addBottler(final Bottler bottler)
     {
+        FijiArchipelago.log("Registered bottler " + bottler.getClass().getName());
         nodeCoordinator.addBottler(bottler);
+    }
+
+    public List<Bottler> getBottlers()
+    {
+        return nodeCoordinator.getBottlers();
     }
 
     /**
