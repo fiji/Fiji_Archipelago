@@ -34,6 +34,13 @@
 		</dependency>
 	</dependencies>
 
+	<scm>
+		<connection>scm:git:git://github.com/fiji/Fiji_Archipelago</connection>
+		<developerConnection>scm:git:git@github.com:fiji/Fiji_Archipelago</developerConnection>
+		<tag>HEAD</tag>
+		<url>https://github.com/fiji/Fiji_Archipelago</url>
+	</scm>
+
 	<repositories>
 		<!-- NB: for project parent, in case of partial checkout -->
 		<repository>
