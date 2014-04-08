@@ -19,6 +19,7 @@ public class NodeParameters
     private int numThreads;
     private NodeShell shell;
     private NodeShellParameters shellParams;
+    private final NodeParametersFactory factory;
 
     public NodeParameters(NodeParameters np)
     {
@@ -30,20 +31,34 @@ public class NodeParameters
         fileRoot = np.getFileRoot();
         numThreads = np.getThreadLimit();
         shellParams = shell.defaultParameters();
+        factory = np.getFactory();
     }
 
     public NodeParameters(String userIn,
                           String hostIn,
                           NodeShell shellIn,
                           String execPath,
-                          String filePath)
+                          String filePath,
+                          final NodeParametersFactory factory)
+    {
+        this(userIn, hostIn, shellIn, execPath, filePath, factory, FijiArchipelago.getUniqueID());
+    }
+
+    public NodeParameters(String userIn,
+                          String hostIn,
+                          NodeShell shellIn,
+                          String execPath,
+                          String filePath,
+                          final NodeParametersFactory factory,
+                          long id)
     {
         user = userIn;
         host = hostIn;
         shell = shellIn;
         execRoot = execPath;
         fileRoot = filePath;
-        id = FijiArchipelago.getUniqueID();
+        this.id = id;
+        this.factory = factory;
         shellParams = shellIn.defaultParameters();
         numThreads = 0;
     }
@@ -89,8 +104,6 @@ public class NodeParameters
         this.numThreads = numThreads;
     }
 
-
-
     public String getUser()
     {
         return user;
@@ -129,6 +142,11 @@ public class NodeParameters
     public int getThreadLimit()
     {
         return numThreads;
+    }
+
+    public NodeParametersFactory getFactory()
+    {
+        return factory;
     }
 
     public String toString()

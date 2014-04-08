@@ -195,7 +195,6 @@ public class MessageXC
                         }
                         objectOutputStream.writeObject(nextMessage);
                         objectOutputStream.flush();
-
                     }
                     /*catch (NotSerializableException nse)
                     {

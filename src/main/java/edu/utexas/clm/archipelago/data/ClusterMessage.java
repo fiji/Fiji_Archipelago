@@ -47,7 +47,8 @@ public class ClusterMessage implements Serializable
     }
     public static String typeToString(final MessageType type)
     {
-        switch (type)
+        return type.toString();
+        /*switch (type)
         {
             case BEAT:
                 return "beat";
@@ -89,7 +90,7 @@ public class ClusterMessage implements Serializable
                 return "bottler";
             default:
                 return "unknown";
-        }
+        }*/
     }
 
 }

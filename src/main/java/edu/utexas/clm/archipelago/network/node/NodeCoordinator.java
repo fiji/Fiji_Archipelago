@@ -21,7 +21,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.Vector;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -48,11 +47,14 @@ public class NodeCoordinator implements NodeStateListener, NodeShellListener, Cl
             setUser = new AtomicBoolean(false);
             setExec = new AtomicBoolean(false);
             nodeId = -1;
+            userName = null;
+            execRoot = null;
+            hostName = null;
 
             xc = new MessageXC(is, os, this, tel);
             xc.queueMessage(MessageType.GETID);
 
-            FijiArchipelago.debug("NodeInitializer: leaving constrructor");
+            FijiArchipelago.debug("NodeInitializer: leaving constructor");
         }
 
         private void cleanup()
@@ -70,45 +72,22 @@ public class NodeCoordinator implements NodeStateListener, NodeShellListener, Cl
                 nodeId = FijiArchipelago.getUniqueID();
                 xc.setId(nodeId);
                 xc.queueMessage(MessageType.SETID, nodeId);
-                xc.queueMessage(MessageType.HOSTNAME);
-                xc.queueMessage(MessageType.USER);
-                xc.queueMessage(MessageType.GETEXECROOT);
             }
         }
 
         private void setupVolunteer()
         {
-            if (setHost.get() && setUser.get() && setExec.get())
+            if (setHost.get())
             {
                 final ClusterNode node;
                 final NodeParameters params;
 
+                params = new NodeParameters(userName, hostName, new DummyNodeShell(), execRoot, "",
+                        cluster.getParametersFactory(), nodeId);
 
-
-                params = new NodeParameters(userName, hostName, new DummyNodeShell(), execRoot, "");
                 node = new ClusterNode(params, tel);
-
-                try
-                {
-                    node.setIOStreams(is, os);
-                }
-                catch (IOException ioe)
-                {
-                    node.fail();
-                    //TODO
-                }
-                catch (TimeoutException te)
-                {
-                    node.fail();
-                    //TODO
-                }
-                catch (InterruptedException ie)
-                {
-                    node.fail();
-                    //TODO
-                }
-
-
+                node.setMessageXC(xc);
+                node.addListener(self);
 
                 cleanup();
             }
@@ -153,8 +132,17 @@ public class NodeCoordinator implements NodeStateListener, NodeShellListener, Cl
                             initVolunteer();
                         }
                         break;
+                    case SETID:
+                        // Set id ack from client. Only happens after a call to initVolunteer.
+                        // Now, request the hostname. When we get a return, we'll setup the
+                        // ClusterNode object. See case HOSTNAME.
+                        xc.queueMessage(MessageType.HOSTNAME);
+                        break;
                     case HOSTNAME:
                         String name = (String)object;
+
+                        FijiArchipelago.debug("Intializer for " + nodeId + " got name " + name);
+
                         if (name.equals(""))
                         {
                             hostName = "Host " + nodeId;

@@ -37,6 +37,7 @@ import java.util.Hashtable;
 import java.util.List;
 import java.util.Vector;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -56,6 +57,7 @@ public class ClusterNode implements TransceiverListener
     private ClusterNodeState state;
     private final Vector<NodeStateListener> stateListeners;
     private final TransceiverExceptionListener xcEListener;
+    private final AtomicBoolean environmentIsSynced, execRootSet, fileSystemSet;
 
 
    
@@ -75,6 +77,9 @@ public class ClusterNode implements TransceiverListener
         nodeParam = params;
         stateListeners = new Vector<NodeStateListener>();
         xcEListener = tel;
+        environmentIsSynced = new AtomicBoolean(false);
+        execRootSet = new AtomicBoolean(false);
+        fileSystemSet = new AtomicBoolean(false);
     }
 
     private void checkState()
@@ -83,43 +88,73 @@ public class ClusterNode implements TransceiverListener
         {
             setState(ClusterNodeState.ACTIVE);
         }
-
     }
 
-    private void doSyncEnvironment()
+    private synchronized void doSyncEnvironment()
     {
-        if (getUser() == null || getUser().equals(""))
+        if (!environmentIsSynced.get())
         {
-            xc.queueMessage(MessageType.USER);
+            if (getUser() == null || getUser().equals(""))
+            {
+                xc.queueMessage(MessageType.USER);
+                return;
+            }
+
+            if (getID() < 0)
+            {
+                xc.queueMessage(MessageType.GETID);
+                return;
+            }
+
+            if (!execRootSet.getAndSet(true))
+            {
+                if (getExecPath() == null || getExecPath().equals(""))
+                {
+                    xc.queueMessage(MessageType.GETEXECROOT);
+                    return;
+                }
+                else
+                {
+                    xc.queueMessage(MessageType.SETEXECROOT, getExecPath());
+                    return;
+                }
+            }
+
+            if (!fileSystemSet.getAndSet(true))
+            {
+                // Two modes: either we've been told specifically what the file path is
+                // or else we are supposed to query the client.
+                if (getFilePath() == null || getFilePath().equals(""))
+                {
+                    // query the client.
+                    xc.queueMessage(MessageType.GETFSTRANSLATION);
+                    return;
+                }
+                else
+                {
+                    // Tell the client how to translate files.
+                    xc.queueMessage(MessageType.SETFSTRANSLATION,
+                            new Duplex<String, String>(getFilePath(),
+                                    FijiArchipelago.getFileRoot()));
+                }
+            }
+
+            if (getThreadLimit() <= 0)
+            {
+                xc.queueMessage(MessageType.NUMTHREADS);
+                return;
+            }
+
+            xc.queueMessage(MessageType.BEAT);
+
+            checkState();
+
+            FijiArchipelago.debug("Environment is synced");
+
+            environmentIsSynced.set(true);
         }
 
-        if (getExecPath() == null || getExecPath().equals(""))
-        {
-            xc.queueMessage(MessageType.GETEXECROOT);
-        }
-        else
-        {
-            xc.queueMessage(MessageType.SETEXECROOT, getExecPath());
-        }
 
-        if (getFilePath() == null || getFilePath().equals(""))
-        {
-            xc.queueMessage(MessageType.GETFSTRANSLATION);
-        }
-
-        if (getID() < 0)
-        {
-            xc.queueMessage(MessageType.GETID);
-        }
-
-        if (getThreadLimit() <= 0)
-        {
-            xc.queueMessage(MessageType.NUMTHREADS);
-        }
-
-        xc.queueMessage(MessageType.BEAT);
-
-        checkState();
     }
     
     public void setExecPath(String path)
@@ -310,6 +345,8 @@ public class ClusterNode implements TransceiverListener
                         xc.setId(nodeID);
                     }
 
+                    doSyncEnvironment();
+
                     checkState();
 
                     break;
@@ -344,6 +381,7 @@ public class ClusterNode implements TransceiverListener
                 case NUMTHREADS:
                     int n = (Integer)object;
                     nodeParam.setThreadLimit(n);
+                    doSyncEnvironment();
                     checkState();
                     break;
                 
@@ -356,31 +394,59 @@ public class ClusterNode implements TransceiverListener
                 case PING:                
                     FijiArchipelago.log("Received ping from " + getHost());
                     break;
-            
-//                case USER:
-//                    if (nodeParam == null)
-//                    {
-//                        FijiArchipelago.err("Tried to set user but params are null");
-//                    }
-//                    if (object != null)
-//                    {
-//                        String username = (String)object;
-//                        nodeParam.setUser(username);
-//                    }
-//                    else
-//                    {
-//                        FijiArchipelago.err("Got username message with null user");
-//                    }
-//                    break;
+
+                case USER:
+
+                    if (object != null)
+                    {
+                        String username = (String)object;
+                        nodeParam.setUser(username);
+                    }
+                    else
+                    {
+                        FijiArchipelago.err("Got username message with null user");
+                        nodeParam.setUser("unknown");
+                    }
+
+                    doSyncEnvironment();
+                    break;
 
                 case GETFSTRANSLATION:
                     // Results of a GETFSTRANSLATION request sent to the client.
-                    setFilePath((String)object);
+                    String path = (String)object;
+                    if (path.equals(""))
+                    {
+                        // We sent a GETFSTRANSLATION because we didn't know the remote file root
+                        // If path is empty, then the client doesn't, either. The default behavior
+                        // in this case is to assume both client and root have hte same fs setup.
+                        xc.queueMessage(MessageType.SETFSTRANSLATION,
+                                new Duplex<String, String>(FijiArchipelago.getFileRoot(),
+                                        FijiArchipelago.getFileRoot()));
+                    }
+                    else
+                    {
+                        setFilePath(path);
+                        xc.queueMessage(MessageType.SETFSTRANSLATION,
+                                new Duplex<String, String>(path, FijiArchipelago.getFileRoot()));
+                    }
+
+
                     break;
-                
+
+                case SETFSTRANSLATION:
+                    // Client ack for setfstranslation.
+                    doSyncEnvironment();
+                    break;
+
                 case GETEXECROOT:
                     // Results of a GETEXECROOT request sent to the client.
                     setExecPath((String)object);
+                    doSyncEnvironment();
+                    break;
+
+                case SETEXECROOT:
+                    // Ack received for set exec root message
+                    doSyncEnvironment();
                     break;
 
                 case ERROR:
@@ -515,9 +581,11 @@ public class ClusterNode implements TransceiverListener
             ClusterNodeState lastState = state;
             state = nextState;
             FijiArchipelago.log("Node state changed from "
-                    + stateString(lastState) + " to " + stateString(nextState));
-            for (NodeStateListener listener : stateListeners)
+                    + stateString(lastState) + " to " + stateString(nextState) + ", updating " +
+                    stateListeners.size() + " listeners");
+            for (NodeStateListener listener : new ArrayList<NodeStateListener>(stateListeners))
             {
+                FijiArchipelago.debug("Updating listener: " + listener.getClass().getName());
                 listener.stateChanged(this, state, lastState);
             }
         }

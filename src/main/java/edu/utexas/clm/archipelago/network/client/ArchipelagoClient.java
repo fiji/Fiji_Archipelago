@@ -147,6 +147,7 @@ public class ArchipelagoClient implements TransceiverListener
             protected boolean handleCustomRX(final Throwable t, final MessageXC xc,
                                              final ClusterMessage cm)
             {
+                t.printStackTrace(System.out);
                 if (t instanceof ClassCastException)
                 {
                     reportRX(t, t.toString(), xc);
@@ -162,7 +163,7 @@ public class ArchipelagoClient implements TransceiverListener
                 else if (t instanceof StreamCorruptedException)
                 {
                     reportRX(t, "Stream corrupted: " + t, xc);
-                    xc.close();
+                    //xc.close();
                     return false;
                 }
                 else
@@ -264,6 +265,8 @@ public class ArchipelagoClient implements TransceiverListener
 
                 case SETID:
                     clientId = (Long)object;
+                    xc.setId(clientId);
+                    xc.queueMessage(MessageType.SETID);
                     break;
 
                 case GETID:
@@ -281,6 +284,7 @@ public class ArchipelagoClient implements TransceiverListener
 
                 case SETEXECROOT:
                     FijiArchipelago.setExecRoot((String) object);
+                    xc.queueMessage(MessageType.SETEXECROOT);
                     break;
 
 
@@ -328,6 +332,7 @@ public class ArchipelagoClient implements TransceiverListener
                     final Duplex<String, String> translation = (Duplex<String, String>)object;
                     xc.setFileSystemTranslator(
                             new PathSubstitutingFileTranslator(translation.a, translation.b));
+                    xc.queueMessage(MessageType.SETFSTRANSLATION);
                     break;
             }
         }

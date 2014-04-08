@@ -14,7 +14,7 @@ public class NodeParametersFactory
     public NodeParametersFactory()
     {
         defaultParameters = new NodeParameters(System.getProperty("user.name"), "",
-                new SSHNodeShell(), "", "");
+                new SSHNodeShell(), "", "", this);
     }
 
     public NodeParameters getNewParameters(final String host)
