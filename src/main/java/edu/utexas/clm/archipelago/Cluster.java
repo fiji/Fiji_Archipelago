@@ -701,7 +701,6 @@ public class Cluster
         if (stateIntToEnum(this.state.get()) == ClusterState.STOPPED)
         {
             FijiArchipelago.debug("Attempted to change state on a STOPPED cluster.");
-            new Exception().printStackTrace();
             return;
         }
         

@@ -324,7 +324,9 @@ public class NodeCoordinator implements NodeStateListener, NodeShellListener, Cl
                 }
                 catch (ShellExecutionException see)
                 {
-                    // TODO
+                    node.close();
+
+                    FijiArchipelago.err(see.getMessage());
                 }
             }
 
@@ -346,7 +348,6 @@ public class NodeCoordinator implements NodeStateListener, NodeShellListener, Cl
         nodeLock.unlock();
 
         FijiArchipelago.debug("NodeCoordinator started node " + node);
-        Thread.dumpStack();
 
         node.addListener(this);
     }

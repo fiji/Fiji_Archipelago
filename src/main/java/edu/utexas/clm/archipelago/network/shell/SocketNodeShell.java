@@ -49,7 +49,7 @@ public class SocketNodeShell extends SSHNodeShell
         {
             final String execFile = param.getExecRoot() + "/" +
                     param.getShellParams().getString("executable");
-            if (JSchUtility.fileExists(param, execFile))
+            if (JSchUtility.verifyParameters(param, execFile))
             {
                 final String command = execFile + " " + getArguments(param, listener);
                 new JSchUtility(param, listener, command).start();

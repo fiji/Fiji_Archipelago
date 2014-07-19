@@ -537,9 +537,13 @@ public class ClusterNode implements TransceiverListener
                 removeProcess(pm);
             }
 
-            FijiArchipelago.debug("Closing XC");
+            // xc is null before starting.
+            if (xc != null)
+            {
+                FijiArchipelago.debug("Closing XC");
 
-            xc.close();
+                xc.close();
+            }
 
             FijiArchipelago.debug("Node: Close finished");
         }
@@ -551,7 +555,7 @@ public class ClusterNode implements TransceiverListener
 
     private boolean sendShutdown()
     {
-        return xc.queueMessage(MessageType.HALT);
+        return xc != null && xc.queueMessage(MessageType.HALT);
     }
     
     public static String stateString(final ClusterNodeState state)
@@ -661,7 +665,11 @@ public class ClusterNode implements TransceiverListener
         if (state == ClusterNodeState.INACTIVE)
         {
             setState(ClusterNodeState.WAITING);
-            nodeParam.getShell().startShell(nodeParam, listener);
+            if (!nodeParam.getShell().startShell(nodeParam, listener))
+            {
+                FijiArchipelago.err("Could not start shell for " + nodeParam);
+                setState(ClusterNodeState.FAILED);
+            }
         }
 
     }

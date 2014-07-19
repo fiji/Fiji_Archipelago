@@ -3,6 +3,7 @@ package edu.utexas.clm.archipelago.network.shell;
 
 import com.jcraft.jsch.*;
 import edu.utexas.clm.archipelago.FijiArchipelago;
+import edu.utexas.clm.archipelago.exception.AuthenticationException;
 import edu.utexas.clm.archipelago.exception.ShellExecutionException;
 import edu.utexas.clm.archipelago.listen.NodeShellListener;
 import edu.utexas.clm.archipelago.network.node.NodeParameters;
@@ -33,8 +34,19 @@ public class SSHNodeShell implements NodeShell
     {
         if (jse.getMessage().equals("Auth cancel"))
         {
-            throw new ShellExecutionException(
-                    "Authentication failed on " + param.getHost(), jse);
+            String keyfile;
+            try
+            {
+                keyfile = param.getShellParams().getString("keyfile");
+            }
+            catch (Exception e)
+            {
+                keyfile = "";
+            }
+
+            throw new AuthenticationException( "Could not authenticate on " +
+                    param.getHost() + " with user " + param.getUser() + ", and key " +
+                            keyfile, jse);
         }
         else if(jse.getCause() != null && jse.getCause() instanceof UnknownHostException)
         {
@@ -52,7 +64,7 @@ public class SSHNodeShell implements NodeShell
         {
             final String execFile = param.getExecRoot() + "/" +
                     param.getShellParams().getString("executable");
-            if (JSchUtility.fileExists(param, execFile))
+            if (JSchUtility.verifyParameters(param, execFile))
             {
                 final String command = execFile + " " + getArguments(param, listener);
                 final JSchUtility util = new JSchUtility(param, listener, command);
@@ -97,8 +109,13 @@ public class SSHNodeShell implements NodeShell
         {
             throw new ShellExecutionException(ioe);
         }
+        catch (ShellExecutionException see)
+        {
+            throw see;
+        }
         catch (Exception e)
         {
+            FijiArchipelago.debug("" + e, e);
             throw new ShellExecutionException(e);
         }
     }

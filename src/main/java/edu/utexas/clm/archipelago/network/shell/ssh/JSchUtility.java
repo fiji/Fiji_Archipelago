@@ -23,7 +23,7 @@ public class JSchUtility extends Thread
     public JSchUtility(final NodeParameters param,
                        final NodeShellListener listener,
                        final String command)
-            throws ShellExecutionException
+            throws ShellExecutionException, JSchException
     {
         FijiArchipelago.debug("Creating JSchUtility to run " + command + " on " + param.getHost());
         try
@@ -42,15 +42,29 @@ public class JSchUtility extends Thread
             session = jsch.getSession(param.getUser(), param.getHost(), port);
 
             session.setUserInfo(ui);
+
+            FijiArchipelago.debug("Connecting session for " + param.getHost());
+
             session.connect();
-            
+
+            FijiArchipelago.debug("Opening a channel on " + param.getHost());
+
             channel = session.openChannel("exec");
+
+            FijiArchipelago.debug("Channel opened on " + param.getHost());
 
             ((ChannelExec)channel).setCommand(command);
             ((ChannelExec)channel).setErrStream(System.err);
         }
+        catch (JSchException jse)
+        {
+            throw jse;
+        }
         catch (Exception e)
         {
+            FijiArchipelago.debug("Ran into a problem while logging into  " + param.getHost() +
+                ": " + e);
+            Thread.dumpStack();
             throw new ShellExecutionException(e);
         }
     }
@@ -96,9 +110,9 @@ public class JSchUtility extends Thread
         session.disconnect();
     }
     
-    public static boolean fileExists(final NodeParameters param,
-                                     final String file)
-            throws ShellExecutionException
+    public static boolean verifyParameters(final NodeParameters param,
+                                           final String file)
+            throws ShellExecutionException, JSchException
     {
         final AtomicInteger result = new AtomicInteger(-1);
         final ReentrantLock lock = new ReentrantLock();
@@ -121,8 +135,12 @@ public class JSchUtility extends Thread
 
         try
         {
+            JSchUtility jUtil;
             lock.lock();
-            new JSchUtility(param, existListener, "test -e " + file).start();
+
+            jUtil = new JSchUtility(param, existListener, "test -e " + file);
+            jUtil.start();
+
             lock.unlock();
             Thread.sleep(Long.MAX_VALUE);
             // The Universe ends, and we return false.
@@ -134,6 +152,16 @@ public class JSchUtility extends Thread
                     " resulted in code " + result.get());
             // We expect to be interrupted
             return (result.get() == 0);
+        }
+        catch (JSchException e)
+        {
+            lock.unlock();
+            throw(e);
+        }
+        catch (ShellExecutionException e)
+        {
+            lock.unlock();
+            throw(e);
         }
     }
     
