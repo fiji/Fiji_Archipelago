@@ -242,6 +242,7 @@ public class ClusterNodeStatusUI implements ActionListener
                         Dimension d = new Dimension(frame.getSize());
                         d.width -= 38;
                         d.height -= 50;
+                        pane.setMinimumSize(d);
                         pane.setPreferredSize(d);
                     }
                 }
