@@ -324,7 +324,8 @@ public class NodeCoordinator implements NodeStateListener, NodeShellListener, Cl
                 }
                 catch (ShellExecutionException see)
                 {
-                    node.close();
+//                    node.close();
+                    node.setState(ClusterNodeState.FAILED);
 
                     FijiArchipelago.err(see.getMessage());
                 }

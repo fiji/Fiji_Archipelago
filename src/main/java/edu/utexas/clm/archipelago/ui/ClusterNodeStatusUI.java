@@ -117,6 +117,13 @@ public class ClusterNodeStatusUI implements ActionListener
                     case INACTIVE:
                         stateLabel.setText("inactive");
                         break;
+                    case WAITING:
+                        stateLabel.setText("waiting");
+                        break;
+                    case FAILED:
+                        stateLabel.setText("failed");
+                        stateLabel.setForeground(Color.red);
+                        break;
                     default:
                         stateLabel.setText("unknown");
                         break;
@@ -263,7 +270,7 @@ public class ClusterNodeStatusUI implements ActionListener
     {
         final Panel hp = new Panel();
         //final Button invisibleButton = new Button("Stop");
-        ClusterUI.doRowPanelLayout(hp, 640, 24, new float[]{5, 1, 1, 2, 2, 2, 1},
+        ClusterUI.doRowPanelLayout(hp, 640, 24, new float[]{5, 2, 1, 2, 2, 2, 1},
                 new Label("Host"), new Label("state"), new Label("n Jobs"), new Label("Beat"),
                 new Label("MB used"), new Label("MB Total"), new Label(""));
 
@@ -318,7 +325,8 @@ public class ClusterNodeStatusUI implements ActionListener
         final ArrayList<ClusterNode> nodes = new ArrayList<ClusterNode>(nodeTable.values());
         for (ClusterNode node : nodes)
         {
-            if (node.getState() == ClusterNodeState.STOPPED)
+            if (node.getState() == ClusterNodeState.STOPPED ||
+                    node.getState() == ClusterNodeState.FAILED)
             {
                 final long id = node.getID();
                 nodeTable.remove(id);
