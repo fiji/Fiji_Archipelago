@@ -53,7 +53,7 @@ public class ClusterNode implements TransceiverListener
     private final AtomicInteger ramMBAvail, ramMBTot, ramMBMax, runningCores;
     private long nodeID;
     private long lastBeatTime;
-    private NodeParameters nodeParam;
+    private final NodeParameters nodeParam;
     private ClusterNodeState state;
     private final Vector<NodeStateListener> stateListeners;
     private final TransceiverExceptionListener xcEListener;
@@ -360,7 +360,7 @@ public class ClusterNode implements TransceiverListener
                     break;
 
                 case LOG:
-                    FijiArchipelago.log(object.toString());
+                    FijiArchipelago.debug(object.toString());
                     break;
 
                 case PROCESS:
@@ -584,7 +584,7 @@ public class ClusterNode implements TransceiverListener
             // Order is very important
             ClusterNodeState lastState = state;
             state = nextState;
-            FijiArchipelago.log("Node state changed from "
+            FijiArchipelago.debug(getHost() + " state changed from "
                     + stateString(lastState) + " to " + stateString(nextState) + ", updating " +
                     stateListeners.size() + " listeners");
             for (NodeStateListener listener : new ArrayList<NodeStateListener>(stateListeners))

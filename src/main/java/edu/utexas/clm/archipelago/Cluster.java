@@ -841,7 +841,7 @@ public class Cluster
 
         final long sTime = System.currentTimeMillis();
         
-        FijiArchipelago.log("Cluster: Waiting for ready nodes");
+        FijiArchipelago.debug("Cluster: Waiting for ready nodes");
 
         // Wait synchronously
         while (wait)
@@ -930,7 +930,7 @@ public class Cluster
 
     public void addBottler(final Bottler bottler)
     {
-        FijiArchipelago.log("Registered bottler " + bottler.getClass().getName());
+        FijiArchipelago.debug("Registered bottler " + bottler.getClass().getName());
         nodeCoordinator.addBottler(bottler);
     }
 
@@ -1144,7 +1144,7 @@ public class Cluster
 
         if (nThreads > maxThreads)
         {
-            FijiArchipelago.log("Requested " + nThreads + " but there are only " + maxThreads
+            FijiArchipelago.debug("Requested " + nThreads + " but there are only " + maxThreads
                     + " available. Using " + maxThreads + " threads");
             nt = maxThreads;
         }

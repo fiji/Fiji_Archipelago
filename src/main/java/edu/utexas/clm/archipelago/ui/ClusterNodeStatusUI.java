@@ -290,7 +290,9 @@ public class ClusterNodeStatusUI implements ActionListener
         {
             final long id = node.getID();
 
-            if (node.getState() != ClusterNodeState.STOPPED && !keySet.contains(id))                
+            if (node.getState() != ClusterNodeState.STOPPED &&
+                    node.getState() != ClusterNodeState.FAILED &&
+                     !keySet.contains(id))
             {
                 final NodeStatusPanel panel = new NodeStatusPanel(node);
                 nodeTable.put(id, node);

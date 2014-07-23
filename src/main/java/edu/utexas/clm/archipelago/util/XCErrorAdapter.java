@@ -62,7 +62,7 @@ public class XCErrorAdapter implements TransceiverExceptionListener
     public void report(final Throwable t, final String message,
                        final HashSet<Class> throwablesSeen)
     {
-        FijiArchipelago.log(message);
+        FijiArchipelago.debug(message);
         if (!throwablesSeen.contains(t.getClass()))
         {
             if (!isQuiet.get())
