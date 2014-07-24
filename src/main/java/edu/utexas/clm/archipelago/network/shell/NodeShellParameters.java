@@ -191,7 +191,7 @@ public class NodeShellParameters
         {
             if (!getStringOrEmpty(key).equals(params.getStringOrEmpty(key)))
             {
-                parameterMap.put(key, defaultParameterMap.get(key));
+                parameterMap.put(key, "");
             }
         }
     }
