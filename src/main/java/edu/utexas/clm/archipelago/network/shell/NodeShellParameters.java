@@ -18,39 +18,55 @@ public class NodeShellParameters
 {
     
     private final HashMap<String, String> parameterMap;
+    private final HashMap<String, String> defaultParameterMap;
     private final ArrayList<String> fileKeys, stringKeys, floatKeys, intKeys;
 
 
     public NodeShellParameters()
     {
         parameterMap = new HashMap<String, String>();
+        defaultParameterMap = new HashMap<String, String>();
         fileKeys = new ArrayList<String>();
         intKeys = new ArrayList<String>();
         floatKeys = new ArrayList<String>();
         stringKeys = new ArrayList<String>();
     }
 
+    public NodeShellParameters(final NodeShellParameters params)
+    {
+        parameterMap = new HashMap<String, String>(params.parameterMap);
+        defaultParameterMap = new HashMap<String, String>(params.defaultParameterMap);
+        fileKeys = new ArrayList<String>(params.fileKeys);
+        intKeys = new ArrayList<String>(params.intKeys);
+        floatKeys = new ArrayList<String>(params.floatKeys);
+        stringKeys = new ArrayList<String>(params.stringKeys);
+    }
+
     protected void addKey(final String key, final File defaultValue)
     {
         parameterMap.put(key, defaultValue.getAbsolutePath());
+        defaultParameterMap.put(key, defaultValue.getAbsolutePath());
         fileKeys.add(key);
     }
 
     protected void addKey(final String key, final String defaultValue)
     {
         parameterMap.put(key, defaultValue);
+        defaultParameterMap.put(key, defaultValue);
         stringKeys.add(key);
     }
 
     protected void addKey(final String key, final int defaultValue)
     {
         parameterMap.put(key, "" + defaultValue);
+        defaultParameterMap.put(key, "" + defaultValue);
         intKeys.add(key);
     }
 
     protected void addKey(final String key, final float defaultValue)
     {
         parameterMap.put(key, "" + defaultValue);
+        defaultParameterMap.put(key, "" + defaultValue);
         floatKeys.add(key);
     }
     
@@ -161,6 +177,22 @@ public class NodeShellParameters
             Element subE = e.getOwnerDocument().createElement(key);
             subE.appendChild(e.getOwnerDocument().createTextNode(getString(key)));
             e.appendChild(subE);
+        }
+    }
+
+    /**
+     * Merge values in this parameter set with params.
+     *
+     * @param params the parameter set with which to merge.
+     */
+    public void merge(final NodeShellParameters params)
+    {
+        for (final String key : getKeys())
+        {
+            if (!getStringOrEmpty(key).equals(params.getStringOrEmpty(key)))
+            {
+                parameterMap.put(key, defaultParameterMap.get(key));
+            }
         }
     }
 }

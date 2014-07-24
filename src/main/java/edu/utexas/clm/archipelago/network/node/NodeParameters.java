@@ -2,6 +2,7 @@ package edu.utexas.clm.archipelago.network.node;
 
 import edu.utexas.clm.archipelago.Cluster;
 import edu.utexas.clm.archipelago.FijiArchipelago;
+import edu.utexas.clm.archipelago.network.shell.DummyNodeShell;
 import edu.utexas.clm.archipelago.network.shell.NodeShell;
 import edu.utexas.clm.archipelago.network.shell.NodeShellParameters;
 
@@ -30,7 +31,7 @@ public class NodeParameters
         execRoot = np.getExecRoot();
         fileRoot = np.getFileRoot();
         numThreads = np.getThreadLimit();
-        shellParams = shell.defaultParameters();
+        shellParams = new NodeShellParameters(np.shellParams);
         factory = np.getFactory();
     }
 
@@ -102,6 +103,54 @@ public class NodeParameters
     public synchronized void setThreadLimit(int numThreads)
     {
         this.numThreads = numThreads;
+    }
+
+    /**
+     * Sets default-empty values for parameters that are different between this NodeParameters and
+     * params.
+     *
+     * For instance, if params' user field is "John" and we have "Thomas" here, then this
+     * parameters' user will be set to "". On the other hand, if both are "Thomas," then the user
+     * string here will remain.
+     *
+     * @param params a NodeParameters to merge to this one
+     */
+    public synchronized void merge(final NodeParameters params)
+    {
+        if (!params.getHost().equals(host))
+        {
+            host = "";
+        }
+
+        if (!params.getUser().equals(user))
+        {
+            user = "";
+        }
+
+        if (!params.getFileRoot().equals(fileRoot))
+        {
+            fileRoot = "";
+        }
+
+        if (!params.getExecRoot().equals(execRoot))
+        {
+            execRoot = "";
+        }
+
+        if (params.getThreadLimit() != numThreads)
+        {
+            numThreads = 0;
+        }
+
+        if (!params.getShell().name().equals(shell.name()))
+        {
+            shell = new DummyNodeShell();
+        }
+        else
+        {
+            shellParams.merge(params.getShellParams());
+        }
+
     }
 
     public String getUser()

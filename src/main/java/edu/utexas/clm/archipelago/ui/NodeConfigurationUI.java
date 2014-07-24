@@ -22,6 +22,7 @@ import edu.utexas.clm.archipelago.Cluster;
 import edu.utexas.clm.archipelago.FijiArchipelago;
 import edu.utexas.clm.archipelago.network.node.NodeParameters;
 import edu.utexas.clm.archipelago.network.node.NodeParametersFactory;
+import edu.utexas.clm.archipelago.network.shell.DummyNodeShell;
 import edu.utexas.clm.archipelago.network.shell.NodeShell;
 import edu.utexas.clm.archipelago.network.shell.NodeShellParameters;
 import ij.gui.GenericDialog;
@@ -204,12 +205,6 @@ public class NodeConfigurationUI extends Panel implements ActionListener
     {
         private final Label label;
 
-        public String hostName;
-        public String execRoot;
-        public String fileRoot;
-        public int cpuLimit;
-        public String user;
-        public NodeShellParameters shellParams;
         public final NodeParameters param;
        
         public NodePanel(NodeParameters param)
@@ -223,13 +218,6 @@ public class NodeConfigurationUI extends Panel implements ActionListener
         {
             Button editButton = new Button("Edit");
             Button rmButton = new Button("Remove");
-
-            this.hostName = param.getHost();
-            this.execRoot = param.getExecRoot();
-            this.fileRoot = param.getFileRoot();
-            this.cpuLimit = param.getThreadLimit();
-            this.user = param.getUser();
-            this.shellParams = param.getShellParams();
 
             add(label);
             add(editButton);
@@ -246,16 +234,7 @@ public class NodeConfigurationUI extends Panel implements ActionListener
 
         private void updateLabel()
         {
-            label.setText(user + "@" + hostName);
-        }
-
-        private void updateParam()
-        {
-            param.setHost(hostName);
-            param.setUser(user);
-            param.setThreadLimit(cpuLimit);
-            param.setExecRoot(execRoot);
-            param.setFileRoot(fileRoot);
+            label.setText(param.getUser() + "@" + param.getHost());
         }
 
 
@@ -272,40 +251,23 @@ public class NodeConfigurationUI extends Panel implements ActionListener
                 gd.showDialog();
                 if (gd.wasOKed())
                 {
-                    //manager.removeParam(param.getID());
                     removeNodePanel(this);
-                    
                 }
             }
         }
 
         public boolean doEdit()
         {
-            GenericDialog gd = new GenericDialog("Edit Cluster Node");
-            NodeShellPanel nsp = new NodeShellPanel(param);
-            gd.addStringField("Hostname", hostName, Math.max(hostName.length(), 64));
-            gd.addStringField("User name", user);
-            gd.addNumericField("Thread Limit", cpuLimit, 0);
-            gd.addStringField("Remote Fiji Root", execRoot, 64);
-            gd.addStringField("Remote File Root", fileRoot, 64);
-            gd.addPanel(nsp);
-            gd.validate();
-            gd.showDialog();
-
-            if (gd.wasOKed())
+            if (editParams(param, "Edit Cluster Node", true))
             {
-                hostName = gd.getNextString();
-                user = gd.getNextString();
-                cpuLimit = (int)gd.getNextNumber();
-                execRoot = gd.getNextString();
-                fileRoot = gd.getNextString();
-                nsp.syncParams();
                 updateLabel();
-                updateParam();
                 validate();
+                return true;
             }
-            
-            return gd.wasOKed();
+            else
+            {
+                return false;
+            }
         }
 
         public NodeParameters getNodeParam()
@@ -314,13 +276,12 @@ public class NodeConfigurationUI extends Panel implements ActionListener
         }
     }
 
-    
     private final NodeParametersFactory paramFactory;
     private final Vector<NodePanel> nodePanels;
     private final Vector<Long> removedNodes;
     private final Panel centralPanel;
-    
-    
+
+    private static final int H_BUTTON = 32, W_BUTTON = 480;
     
     private NodeConfigurationUI(NodeParametersFactory factory, Collection<NodeParameters> nodeParams)
     {
@@ -328,6 +289,8 @@ public class NodeConfigurationUI extends Panel implements ActionListener
         centralPanel = new Panel();
         final ScrollPane pane = new ScrollPane();        
         final Button addButton = new Button("Add Node...");
+        final Button editAllButton = new Button("Edit all...");
+        final Dimension buttonSize = new Dimension(W_BUTTON, H_BUTTON);
         //final Dimension panelSize = new Dimension(512, 256);
 
         FijiArchipelago.debug("NodeConfigUI got " + nodeParams.size() + " existing parameters");
@@ -338,9 +301,15 @@ public class NodeConfigurationUI extends Panel implements ActionListener
         
         super.setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         super.add(pane);
+        super.add(editAllButton);
         super.add(addButton);
 
+
         addButton.addActionListener(this);
+        editAllButton.addActionListener(this);
+
+        addButton.setActionCommand("add");
+        editAllButton.setActionCommand("edit");
 
         centralPanel.setLayout(new BoxLayout(centralPanel, BoxLayout.Y_AXIS));
         pane.add(centralPanel);
@@ -348,10 +317,17 @@ public class NodeConfigurationUI extends Panel implements ActionListener
         //super.setSize(new Dimension(512, 256));
         super.setMinimumSize(new Dimension(512, 256));
         super.setPreferredSize(new Dimension(512, 256));
-        addButton.setPreferredSize(new Dimension(480, 48));
-        addButton.setSize(new Dimension(480, 48));
-        addButton.setMaximumSize(new Dimension(480, 48));
-        addButton.setMinimumSize(new Dimension(480, 48));
+
+        // Does a Button modify a Dimension internally? Unsure, also, they're cheap.
+        addButton.setPreferredSize(new Dimension(buttonSize));
+        addButton.setSize(new Dimension(buttonSize));
+        addButton.setMaximumSize(new Dimension(buttonSize));
+        addButton.setMinimumSize(new Dimension(buttonSize));
+
+        editAllButton.setPreferredSize(new Dimension(buttonSize));
+        editAllButton.setSize(new Dimension(buttonSize));
+        editAllButton.setMaximumSize(new Dimension(buttonSize));
+        editAllButton.setMinimumSize(new Dimension(buttonSize));
 
         for (NodeParameters p : nodeParams)
         {
@@ -379,12 +355,190 @@ public class NodeConfigurationUI extends Panel implements ActionListener
         super.validate();
     }
 
-    public void actionPerformed(final ActionEvent actionEvent)
+    private boolean editParams(final NodeParameters param,
+                               final String title,
+                               final boolean editHost)
+    {
+        GenericDialog gd = new GenericDialog(title);
+        NodeShellPanel nsp = new NodeShellPanel(param);
+
+        if (editHost)
+        {
+            gd.addStringField("Hostname", param.getHost(), Math.max(param.getHost().length(), 64));
+        }
+
+        gd.addStringField("User name", param.getUser());
+        gd.addNumericField("Thread Limit", param.getThreadLimit(), 0);
+        gd.addStringField("Remote Fiji Root", param.getExecRoot(), 64);
+        gd.addStringField("Remote File Root", param.getFileRoot(), 64);
+        gd.addPanel(nsp);
+        gd.validate();
+        gd.showDialog();
+
+        if (gd.wasOKed())
+        {
+            if (editHost)
+            {
+                param.setHost(gd.getNextString());
+            }
+            param.setUser(gd.getNextString());
+            param.setThreadLimit((int)gd.getNextNumber());
+            param.setExecRoot(gd.getNextString());
+            param.setFileRoot(gd.getNextString());
+            nsp.syncParams();
+        }
+
+        return gd.wasOKed();
+    }
+
+    private void addNewNode()
     {
         final NodePanel np = addNode(paramFactory.getNewParameters(""));
         if (!np.doEdit())
         {
             removeNodePanel(np);
+        }
+    }
+
+    private void setAllUser(String user)
+    {
+        for (final NodePanel np : nodePanels)
+        {
+            np.param.setUser(user);
+        }
+    }
+
+    private void setAllFileRoot(String fileRoot)
+    {
+        for (final NodePanel np : nodePanels)
+        {
+            np.param.setFileRoot(fileRoot);
+        }
+    }
+
+    private void setAllExecRoot(String execRoot)
+    {
+        for (final NodePanel np : nodePanels)
+        {
+            np.param.setExecRoot(execRoot);
+        }
+    }
+
+    private void setAllThreadLimit(int threads)
+    {
+        for (final NodePanel np : nodePanels)
+        {
+            np.param.setThreadLimit(threads);
+        }
+    }
+
+    private void setAllShell(final NodeShell shell)
+    {
+        for (final NodePanel np : nodePanels)
+        {
+            np.param.setShell(shell, shell.defaultParameters());
+        }
+    }
+
+    private void setAllShellParams(final NodeShellParameters paramsNew,
+                                   final NodeShellParameters paramsOrig)
+    {
+        final HashMap<String, String> map = new HashMap<String, String>();
+        for (String key : paramsNew.getKeys())
+        {
+            String value = paramsNew.getStringOrEmpty(key);
+            if (!value.equals(paramsOrig.getStringOrEmpty(key)))
+            {
+                map.put(key, value);
+            }
+        }
+
+        for (final NodePanel np : nodePanels)
+        {
+            for (String key : map.keySet())
+            {
+                try
+                {
+                    np.param.getShellParams().putValue(key, map.get(key));
+                }
+                catch (Exception e)
+                {
+                    // Things should have been vetted by this point. If we get here, then there's
+                    // something wrong with the code.
+                    throw new RuntimeException(e);
+                }
+            }
+        }
+
+    }
+
+    private void bulkEdit()
+    {
+        if (nodePanels.size() < 1)
+        {
+            FijiArchipelago.err("No nodes to edit");
+        }
+        else
+        {
+            NodeParameters param = new NodeParameters(nodePanels.get(0).param);
+            NodeParameters paramClone;
+
+            // Generate a NodeParameters object
+
+            for (final NodePanel np : nodePanels)
+            {
+               param.merge(np.param);
+            }
+
+            paramClone = new NodeParameters(param);
+
+            if (editParams(param, "Edit All Nodes", false))
+            {
+                if (!param.getUser().equals(paramClone.getUser()))
+                {
+                    setAllUser(param.getUser());
+                }
+
+                if (!param.getFileRoot().equals(paramClone.getFileRoot()))
+                {
+                    setAllFileRoot(param.getFileRoot());
+                }
+
+                if (!param.getExecRoot().equals(paramClone.getExecRoot()))
+                {
+                    setAllExecRoot(param.getExecRoot());
+                }
+
+                if (param.getThreadLimit() != paramClone.getThreadLimit())
+                {
+                    setAllThreadLimit(param.getThreadLimit());
+                }
+
+                if (!param.getShell().name().equals(paramClone.getShell().name()))
+                {
+                    setAllShell(param.getShell());
+                }
+
+                setAllShellParams(param.getShellParams(), paramClone.getShellParams());
+            }
+
+        }
+    }
+
+    public void actionPerformed(final ActionEvent actionEvent)
+    {
+        if (actionEvent.getActionCommand().equals("add"))
+        {
+            addNewNode();
+        }
+        else if(actionEvent.getActionCommand().equals("edit"))
+        {
+            bulkEdit();
+        }
+        else
+        {
+            // Screwed something up
+            assert false;
         }
     }
     

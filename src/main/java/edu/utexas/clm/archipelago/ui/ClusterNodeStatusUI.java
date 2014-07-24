@@ -29,7 +29,6 @@ import java.awt.*;
 import java.awt.event.*;
 import java.util.ArrayList;
 import java.util.Hashtable;
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
@@ -106,27 +105,17 @@ public class ClusterNodeStatusUI implements ActionListener
         {
             if (stateNow != lastState)
             {
-                switch (stateNow)
+                String stateString = ClusterNode.stateString(stateNow);
+
+                stateLabel.setText(stateString);
+
+                if (stateNow == ClusterNodeState.FAILED)
                 {
-                    case STOPPED:
-                        stateLabel.setText("stopped");
-                        break;
-                    case ACTIVE:
-                        stateLabel.setText("active");
-                        break;
-                    case INACTIVE:
-                        stateLabel.setText("inactive");
-                        break;
-                    case WAITING:
-                        stateLabel.setText("waiting");
-                        break;
-                    case FAILED:
-                        stateLabel.setText("failed");
-                        stateLabel.setForeground(Color.red);
-                        break;
-                    default:
-                        stateLabel.setText("unknown");
-                        break;
+                    stateLabel.setForeground(Color.red);
+                }
+                else
+                {
+                    stateLabel.setForeground(Color.black);
                 }
             }
         }
