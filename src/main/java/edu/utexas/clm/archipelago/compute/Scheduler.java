@@ -22,6 +22,7 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class Scheduler extends Thread implements ProcessListener
 {
+    private static final boolean ENABLE_VERBOSE_DEBUGGING = false;
     private static final int DEFAULT_PAUSE_MS = 1000;
 
     private final Cluster cluster;
@@ -44,6 +45,13 @@ public class Scheduler extends Thread implements ProcessListener
     // This list will be empty until close() is called.
     private final ArrayList<ProcessManager<?>> remainingProcessManagers;
 
+    private static void verboseDebug(final String message)
+    {
+        if (ENABLE_VERBOSE_DEBUGGING)
+        {
+            FijiArchipelago.debug(message);
+        }
+    }
 
     public Scheduler(final Cluster cluster)
     {
@@ -430,9 +438,9 @@ public class Scheduler extends Thread implements ProcessListener
             final Set<ClusterNode> currentNodes;
             final ArrayList<ClusterNode> removeList = new ArrayList<ClusterNode>();
 
-            FijiArchipelago.debug("Scheduler: run acquiring scheduler lock");
+            verboseDebug("Scheduler: run acquiring scheduler lock");
             schedulerLock.lock();
-            FijiArchipelago.debug("Scheduler: run got it");
+            verboseDebug("Scheduler: run got it");
 
             // First, update the node list
             currentNodes = cluster.getNodeCoordinator().getAvailableNodes();
@@ -457,15 +465,15 @@ public class Scheduler extends Thread implements ProcessListener
                 }
             }
 
-            FijiArchipelago.debug("Scheduler: " + nodeList.size() + " nodes available");
+            verboseDebug("Scheduler: " + nodeList.size() + " nodes available");
 
             comparator.setThreadCount(cluster.getMaxThreads());
 
             // Lock the queues, drain  them to internal queues here.
 
-            FijiArchipelago.debug("Scheduler: run acquiring queue lock");
+            verboseDebug("Scheduler: run acquiring queue lock");
             queueLock.lock();
-            FijiArchipelago.debug("Scheduler: run got it");
+            verboseDebug("Scheduler: run got it");
 
             okToSleep.set(false);
 
@@ -485,9 +493,9 @@ public class Scheduler extends Thread implements ProcessListener
 
             updateQueueSize();
 
-            FijiArchipelago.debug("Scheduler: run releasing queue lock");
+            verboseDebug("Scheduler: run releasing queue lock");
             queueLock.unlock();
-            FijiArchipelago.debug("Scheduler: internal queues have " +
+            verboseDebug("Scheduler: internal queues have " +
                     (internalNormalQueue.size() + internalPriorityQueue.size()) + " jobs");
 
             if (!nodeList.isEmpty())
@@ -497,7 +505,7 @@ public class Scheduler extends Thread implements ProcessListener
                 doSubmit(internalNormalQueue, nodeList);
             }
 
-            FijiArchipelago.debug("Scheduler: run releasing scheduler lock");
+            verboseDebug("Scheduler: run releasing scheduler lock");
             schedulerLock.unlock();
 
             // if okToSleep is true, new jobs may have been added since we checked last.
@@ -507,15 +515,15 @@ public class Scheduler extends Thread implements ProcessListener
                 {
                     // In practice, sleep for only a second or so. This prevents a deadlock that can
                     // occur in rare occasions when we are poke()'d between schedulerLock.unlock() and here.
-                    FijiArchipelago.debug("Scheduler: run going to sleep");
+                    verboseDebug("Scheduler: run going to sleep");
                     ateAnApple.set(true);
                     Thread.sleep(pauseTime.get());
                     ateAnApple.set(false);
-                    FijiArchipelago.debug("Scheduler: run awoke");
+                    verboseDebug("Scheduler: run awoke");
                 }
                 catch (InterruptedException ie)
                 {
-                    FijiArchipelago.debug("Scheduler: run poked");
+                    verboseDebug("Scheduler: run poked");
                     ateAnApple.set(false);
                     if (!running.get())
                     {
@@ -526,7 +534,7 @@ public class Scheduler extends Thread implements ProcessListener
                 }
             }
 
-            FijiArchipelago.debug("Scheduler: end of run loop");
+            verboseDebug("Scheduler: end of run loop");
 
         }
     }
