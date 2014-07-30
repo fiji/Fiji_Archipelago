@@ -295,8 +295,23 @@ public class MessageXC
 
         id = -1;
 
-        rxThread.start();
-        txThread.start();
+        new Thread()
+        {
+            public void run()
+            {
+                try
+                {
+                    Thread.sleep(100);
+                    rxThread.start();
+                    txThread.start();
+                }
+                catch (InterruptedException ie)
+                {
+                    xcExceptionListener.handleRXThrowable(ie, xc, null);
+                    close();
+                }
+            }
+        }.start();
     }
 
     public long getLastProcessID()

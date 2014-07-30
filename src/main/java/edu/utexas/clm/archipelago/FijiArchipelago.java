@@ -61,8 +61,7 @@ public final class FijiArchipelago
 
     public static synchronized void setFileRoot(final String root)
     {
-        //Ensure that file root ends with /
-        fileRoot = root.endsWith("/") ? root : root + "/";
+        fileRoot = root;
     }
     
     public static synchronized void setExecRoot(final String root)
