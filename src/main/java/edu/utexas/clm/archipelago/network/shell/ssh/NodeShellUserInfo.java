@@ -1,6 +1,7 @@
 package edu.utexas.clm.archipelago.network.shell.ssh;
 
 import com.jcraft.jsch.UserInfo;
+
 import ij.IJ;
 import ij.gui.GenericDialog;
 

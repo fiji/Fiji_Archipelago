@@ -20,7 +20,6 @@ package edu.utexas.clm.archipelago.network.server;
 
 import edu.utexas.clm.archipelago.Cluster;
 import edu.utexas.clm.archipelago.FijiArchipelago;
-import edu.utexas.clm.archipelago.exception.ShellExecutionException;
 import edu.utexas.clm.archipelago.listen.ClusterStateListener;
 import edu.utexas.clm.archipelago.listen.NodeShellListener;
 

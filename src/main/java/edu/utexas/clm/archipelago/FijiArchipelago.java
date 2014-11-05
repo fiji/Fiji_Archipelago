@@ -20,7 +20,11 @@ package edu.utexas.clm.archipelago;
 
 import edu.utexas.clm.archipelago.network.client.ArchipelagoClient;
 import edu.utexas.clm.archipelago.ui.ClusterUI;
-import edu.utexas.clm.archipelago.util.*;
+import edu.utexas.clm.archipelago.util.EasyLogger;
+import edu.utexas.clm.archipelago.util.IJLogger;
+import edu.utexas.clm.archipelago.util.IJPopupLogger;
+import edu.utexas.clm.archipelago.util.NullLogger;
+import edu.utexas.clm.archipelago.util.PrintStreamLogger;
 import ij.gui.GenericDialog;
 
 import java.awt.Dimension;

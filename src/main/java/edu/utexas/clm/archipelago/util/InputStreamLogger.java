@@ -19,8 +19,6 @@
 package edu.utexas.clm.archipelago.util;
 
 
-import edu.utexas.clm.archipelago.util.EasyLogger;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;

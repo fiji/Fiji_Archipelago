@@ -19,7 +19,10 @@
 package edu.utexas.clm.archipelago;
 
 
-import edu.utexas.clm.archipelago.compute.*;
+import edu.utexas.clm.archipelago.compute.ProcessManager;
+import edu.utexas.clm.archipelago.compute.QuickCallable;
+import edu.utexas.clm.archipelago.compute.QuickRunnable;
+import edu.utexas.clm.archipelago.compute.Scheduler;
 import edu.utexas.clm.archipelago.data.ClusterMessage;
 import edu.utexas.clm.archipelago.listen.ClusterStateListener;
 import edu.utexas.clm.archipelago.listen.MessageType;

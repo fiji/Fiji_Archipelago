@@ -25,7 +25,12 @@ import edu.utexas.clm.archipelago.util.IJPopupLogger;
 import edu.utexas.clm.archipelago.util.PrintStreamLogger;
 import ij.plugin.PlugIn;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.PrintStream;
 import java.net.Socket;
 import java.text.SimpleDateFormat;
 import java.util.Date;

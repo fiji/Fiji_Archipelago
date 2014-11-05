@@ -1,7 +1,9 @@
 package edu.utexas.clm.archipelago.network.shell;
 
 
-import com.jcraft.jsch.*;
+import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.JSchException;
+
 import edu.utexas.clm.archipelago.FijiArchipelago;
 import edu.utexas.clm.archipelago.exception.AuthenticationException;
 import edu.utexas.clm.archipelago.exception.ShellExecutionException;

@@ -19,19 +19,23 @@
 package edu.utexas.clm.archipelago.network.client;
 
 import edu.utexas.clm.archipelago.FijiArchipelago;
+import edu.utexas.clm.archipelago.compute.ProcessManager;
+import edu.utexas.clm.archipelago.data.ClusterMessage;
 import edu.utexas.clm.archipelago.data.Duplex;
 import edu.utexas.clm.archipelago.data.HeartBeat;
 import edu.utexas.clm.archipelago.listen.MessageType;
 import edu.utexas.clm.archipelago.listen.TransceiverExceptionListener;
 import edu.utexas.clm.archipelago.listen.TransceiverListener;
-import edu.utexas.clm.archipelago.compute.ProcessManager;
-import edu.utexas.clm.archipelago.data.ClusterMessage;
 import edu.utexas.clm.archipelago.network.MessageXC;
 import edu.utexas.clm.archipelago.network.translation.Bottler;
 import edu.utexas.clm.archipelago.network.translation.PathSubstitutingFileTranslator;
 import edu.utexas.clm.archipelago.util.XCErrorAdapter;
 
-import java.io.*;
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.StreamCorruptedException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;

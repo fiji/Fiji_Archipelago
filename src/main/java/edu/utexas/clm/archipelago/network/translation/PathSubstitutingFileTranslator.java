@@ -1,6 +1,5 @@
 package edu.utexas.clm.archipelago.network.translation;
 
-import java.io.File;
 
 /**
  *

@@ -22,20 +22,29 @@ import edu.utexas.clm.archipelago.Cluster;
 import edu.utexas.clm.archipelago.FijiArchipelago;
 import edu.utexas.clm.archipelago.network.node.NodeParameters;
 import edu.utexas.clm.archipelago.network.node.NodeParametersFactory;
-import edu.utexas.clm.archipelago.network.shell.DummyNodeShell;
 import edu.utexas.clm.archipelago.network.shell.NodeShell;
 import edu.utexas.clm.archipelago.network.shell.NodeShellParameters;
 import ij.gui.GenericDialog;
 import ij.io.OpenDialog;
 
-import javax.swing.*;
-
-import java.awt.*;
+import java.awt.Button;
+import java.awt.Choice;
+import java.awt.Dimension;
+import java.awt.Label;
+import java.awt.Panel;
+import java.awt.ScrollPane;
+import java.awt.TextField;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.Vector;
+
+import javax.swing.BoxLayout;
 
 public class NodeConfigurationUI extends Panel implements ActionListener
 {

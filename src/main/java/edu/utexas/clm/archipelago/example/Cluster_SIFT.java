@@ -28,14 +28,16 @@ import ij.ImageStack;
 import ij.VirtualStack;
 import ij.plugin.PlugIn;
 import ij.process.ImageProcessor;
-import mpicbg.ij.SIFT;
-import mpicbg.imagefeatures.Feature;
-import mpicbg.imagefeatures.FloatArray2DSIFT;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+
+import mpicbg.ij.SIFT;
+import mpicbg.imagefeatures.Feature;
+import mpicbg.imagefeatures.FloatArray2DSIFT;
 
 /**
  *

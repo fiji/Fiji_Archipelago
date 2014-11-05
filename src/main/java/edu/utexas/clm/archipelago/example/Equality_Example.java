@@ -20,7 +20,6 @@ package edu.utexas.clm.archipelago.example;
 
 import edu.utexas.clm.archipelago.Cluster;
 import edu.utexas.clm.archipelago.compute.SerializableCallable;
-
 import ij.IJ;
 import ij.plugin.PlugIn;
 
