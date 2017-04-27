@@ -79,8 +79,8 @@ public class Cluster_SIFT implements PlugIn
      *                  to work properly, they must exist within the Cluster file root, which
      *                  is indicated by FijiArchipelago.getFileRoot().
      * @param param The SIFT parameters
-     * @return An ArrayList of ArrayLists of Features, such that the ArrayList<Feature>
-     *     corresponding to the ith file in fileNames is returned in the ith position here.
+     * @return An {@link ArrayList} of {@link ArrayList}s of {@link Feature}s, such that the {@code ArrayList<Feature>}
+     *     corresponding to the ith file in {@code fileNames} is returned in the ith position here.
      */
     public static ArrayList<ArrayList<Feature>> clusterSIFTExtraction(Collection<String> fileNames,
                                                                       FloatArray2DSIFT.Param param)
